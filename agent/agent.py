@@ -94,6 +94,59 @@ logging.basicConfig(
 log = logging.getLogger("agent")
 
 # ============================================================
+# Answer Post-processing
+# ============================================================
+
+import re
+
+# 답변에서 유효한 라인만 추출하는 패턴
+_TOPOLOGY_RE = re.compile(r'^[\w-]+\([A-Za-z0-9/]+\)\s*->\s*[\w-]+\([A-Za-z0-9/]+\)$')
+_PATH_RE = re.compile(r'^[\w-]+(?:\s*->\s*[\w-]+)+$')
+_FAULT_RE = re.compile(r'^[\w-]+;[^;\n]+;[^;\n]+$')
+
+
+def postprocess_answer(raw: str) -> str:
+    """모델 출력에서 유효한 답변 라인만 추출"""
+    lines = [l.strip() for l in raw.strip().splitlines() if l.strip()]
+    if not lines:
+        return raw.strip()
+
+    # 패턴 매칭으로 유효 라인 추출
+    topology_lines = [l for l in lines if _TOPOLOGY_RE.match(l)]
+    path_lines = [l for l in lines if _PATH_RE.match(l)]
+    fault_lines = [l for l in lines if _FAULT_RE.match(l)]
+
+    if topology_lines:
+        return '\n'.join(topology_lines)
+    if fault_lines:
+        return '\n'.join(fault_lines)
+    if path_lines:
+        # path는 보통 1줄 - 가장 긴 것 선택
+        return max(path_lines, key=lambda x: x.count('->'))
+
+    # 패턴 매칭 실패 시 원본 반환 (불필요 프리앰블 제거)
+    # "Based on...", "Here is..." 등 제거
+    cleaned = []
+    skip_preamble = True
+    for line in lines:
+        lower = line.lower()
+        if skip_preamble and any(lower.startswith(p) for p in [
+            'based on', 'here is', 'here are', 'the answer', 'according to',
+            'from the', 'after analyzing', 'summary', 'analysis',
+            'these represent', 'this shows', 'the following',
+        ]):
+            continue
+        if skip_preamble and line and not line[0].isalnum():
+            # 번호 매기기(1., 2.) 등 제거
+            if re.match(r'^\d+\.?\s', line):
+                continue
+        skip_preamble = False
+        cleaned.append(line)
+
+    return '\n'.join(cleaned).strip() if cleaned else raw.strip()
+
+
+# ============================================================
 # NOC API Client
 # ============================================================
 
@@ -226,6 +279,17 @@ Strategy:
 5. **Time awareness**: You have 10 minutes. If data is sufficient, answer immediately
 6. **Error handling**: If a command returns error/empty, try alternative commands or skip
 7. **Vendor detection**: Determine vendor from device name patterns or question context
+
+## OUTPUT FORMAT RULES (ABSOLUTE - NEVER VIOLATE)
+- Your final message must contain ONLY the answer lines, nothing else
+- Do NOT start with "Based on...", "Here is...", "The answer is...", or any preamble
+- Do NOT add explanations, summaries, or analysis after the answer
+- Do NOT number the lines (1., 2., etc.) unless the question explicitly requires it
+- For topology: each line is `TargetNode(port)->PeerNode(port)` and NOTHING else
+- For path: single line `NodeA->NodeB->NodeC` and NOTHING else
+- For fault: each line is `node;target;cause` and NOTHING else
+- No blank lines at start or end
+- No trailing spaces or extra whitespace
 """
 
 
@@ -268,7 +332,7 @@ def run_agent(question_id: int, question_text: str) -> dict:
                 elapsed = time.time() - start_time
                 return {
                     "question_id": question_id,
-                    "answer": content.strip(),
+                    "answer": postprocess_answer(content),
                     "tool_calls": tool_calls_count,
                     "duration_s": round(elapsed, 1),
                     "iterations": iteration + 1,
@@ -337,7 +401,7 @@ def run_agent(question_id: int, question_text: str) -> dict:
             log.info(f"  [Q{question_id}] Answer received ({elapsed:.1f}s, {tool_calls_count} tool calls)")
             return {
                 "question_id": question_id,
-                "answer": msg.content.strip(),
+                "answer": postprocess_answer(msg.content or ""),
                 "tool_calls": tool_calls_count,
                 "duration_s": round(elapsed, 1),
                 "iterations": iteration + 1,
@@ -369,7 +433,7 @@ def run_agent(question_id: int, question_text: str) -> dict:
                         elapsed = time.time() - start_time
                         return {
                             "question_id": question_id,
-                            "answer": content.strip(),
+                            "answer": postprocess_answer(content),
                             "tool_calls": tool_calls_count,
                             "duration_s": round(elapsed, 1),
                             "iterations": iteration + 1,
@@ -388,7 +452,7 @@ def run_agent(question_id: int, question_text: str) -> dict:
 
     return {
         "question_id": question_id,
-        "answer": last_content.strip(),
+        "answer": postprocess_answer(last_content),
         "tool_calls": tool_calls_count,
         "duration_s": round(elapsed, 1),
         "iterations": MAX_ITERATIONS,
