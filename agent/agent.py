@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Track B Agent: IP Network Troubleshooting Agent
-HuggingFace Inference API (novita) + Qwen3.5-35B-A3B
+Qwen3.5-35B-A3B via OpenRouter / HuggingFace / DashScope
 """
 
 import argparse
@@ -11,24 +11,75 @@ import json
 import logging
 import os
 import time
+from pathlib import Path
 from typing import Any
 
 import requests
+
+# .env 파일에서 환경변수 로드
+_env_path = Path(__file__).resolve().parent.parent / ".env"
+if _env_path.exists():
+    with open(_env_path) as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line and not _line.startswith("#") and "=" in _line:
+                _key, _, _val = _line.partition("=")
+                os.environ.setdefault(_key.strip(), _val.strip())
 from openai import OpenAI
 
 # ============================================================
 # Configuration
 # ============================================================
 
-HF_TOKEN = os.environ.get("HF_TOKEN", "")
-if not HF_TOKEN:
-    token_path = os.path.expanduser("~/.cache/huggingface/token")
-    if os.path.exists(token_path):
-        with open(token_path) as f:
-            HF_TOKEN = f.read().strip()
+# API provider config (priority: CLI arg > env var > defaults)
+# Supported providers: openrouter, huggingface, dashscope, local
+PROVIDERS = {
+    "openrouter": {
+        "base_url": "https://openrouter.ai/api/v1",
+        "model": "qwen/qwen3.5-35b-a3b",
+        "env_key": "OPENROUTER_API_KEY",
+    },
+    "huggingface": {
+        "base_url": "https://router.huggingface.co/novita/v3/openai",
+        "model": "qwen/qwen3.5-35b-a3b",
+        "env_key": "HF_TOKEN",
+        "token_file": "~/.cache/huggingface/token",
+    },
+    "dashscope": {
+        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "model": "qwen3.5-flash",
+        "env_key": "DASHSCOPE_API_KEY",
+    },
+    "local": {
+        "base_url": "http://localhost:8000/v1",
+        "model": "Qwen/Qwen3.5-35B-A3B",
+        "env_key": "",
+    },
+}
 
-MODEL_BASE_URL = "https://router.huggingface.co/novita/v3/openai"
-MODEL_NAME = "qwen/qwen3.5-35b-a3b"
+DEFAULT_PROVIDER = "openrouter"
+
+
+def _resolve_api_key(provider_cfg: dict) -> str:
+    env_key = provider_cfg.get("env_key", "")
+    if env_key:
+        val = os.environ.get(env_key, "")
+        if val:
+            return val
+    token_file = provider_cfg.get("token_file", "")
+    if token_file:
+        path = os.path.expanduser(token_file)
+        if os.path.exists(path):
+            with open(path) as f:
+                return f.read().strip()
+    return "EMPTY"
+
+
+PROVIDER_NAME = os.environ.get("LLM_PROVIDER", DEFAULT_PROVIDER)
+_provider_cfg = PROVIDERS[PROVIDER_NAME]
+API_KEY = _resolve_api_key(_provider_cfg)
+MODEL_BASE_URL = _provider_cfg["base_url"]
+MODEL_NAME = _provider_cfg["model"]
 
 NOC_API_URL = "http://127.0.0.1:7860/api/agent/execute"
 MAX_ITERATIONS = 30
@@ -183,7 +234,7 @@ Strategy:
 # ============================================================
 
 def run_agent(question_id: int, question_text: str) -> dict:
-    client = OpenAI(base_url=MODEL_BASE_URL, api_key=HF_TOKEN)
+    client = OpenAI(base_url=MODEL_BASE_URL, api_key=API_KEY)
 
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": SYSTEM_PROMPT},
@@ -428,7 +479,27 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--output", default="agent/results")
     parser.add_argument("--questions", type=str, default=None, help="e.g., 1,2,5")
     parser.add_argument("--fresh", action="store_true", help="Start fresh, ignore previous results")
+    parser.add_argument(
+        "--provider", type=str, default=None,
+        choices=list(PROVIDERS.keys()),
+        help="LLM provider (default: openrouter)",
+    )
     args = parser.parse_args()
+
+    # CLI --provider overrides env var
+    provider = args.provider or PROVIDER_NAME
+    cfg = PROVIDERS[provider]
+    api_key = _resolve_api_key(cfg)
+    base_url = cfg["base_url"]
+    model = cfg["model"]
+
+    # Patch module-level vars so run_agent picks them up
+    import agent as _self
+    _self.API_KEY = api_key
+    _self.MODEL_BASE_URL = base_url
+    _self.MODEL_NAME = model
+
+    log.info(f"Provider: {provider} | Model: {model} | URL: {base_url}")
 
     qids = [int(x) for x in args.questions.split(",")] if args.questions else None
     evaluate(args.input, args.output, qids, args.fresh)
