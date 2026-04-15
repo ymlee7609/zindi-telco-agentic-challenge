@@ -295,8 +295,10 @@ def build_type_hint(qtype: str, question_text: str) -> str:
         if info["can_query_target"] and target:
             return (
                 f"STRATEGY: This is a TOPOLOGY question. Target node: {target}.\n"
-                f"Step 1: Query `display lldp neighbor brief` and `display interface brief` on {target}.\n"
-                f"Step 2: Cross-reference to build link list.\n"
+                f"Step 1: Query `display interface brief` on {target} to find UP ports.\n"
+                f"Step 2: Query `display current-configuration` on {target}.\n"
+                f"Step 3: Parse each UP interface's `description` field: From_X_PortA_To_Y_PortB\n"
+                f"IMPORTANT: LLDP may return 'No permission'. Use description field from config as primary source.\n"
                 f"Output ONLY lines in format: {target}(port)->PeerNode(port)"
             )
         elif neighbors:
@@ -304,9 +306,10 @@ def build_type_hint(qtype: str, question_text: str) -> str:
             return (
                 f"STRATEGY: This is a TOPOLOGY question. Target: {target} (CANNOT query directly).\n"
                 f"Known neighbors: {neighbor_list}\n"
-                f"Step 1: Query `display lldp neighbor brief` on ALL neighbors simultaneously (batch tool calls).\n"
+                f"Step 1: Query `display lldp neighbor brief` on ALL neighbors simultaneously.\n"
                 f"Step 2: For each neighbor, look for {target} in LLDP output.\n"
-                f"Step 3: If LLDP empty, fallback to `display arp` + `display interface brief`.\n"
+                f"Step 3: If LLDP returns 'No permission' or empty: query `display current-configuration` instead.\n"
+                f"Step 4: In config, look for description fields pointing to {target}.\n"
                 f"Output ONLY lines in format: {target}(port)->PeerNode(port)"
             )
         return ""
@@ -326,11 +329,13 @@ def build_type_hint(qtype: str, question_text: str) -> str:
         if dest_iface:
             hint += f", Dest Interface: {dest_iface}"
         hint += (
-            f"\nStep 1: Get destination IP - query `display ip interface brief` on {dest or 'destination node'}."
-            f"\nStep 2: On {source}, query `display ip routing-table` to find next-hop."
-            f"\nStep 3: Trace hop-by-hop until destination reached."
-            f"\nBatch tool calls: query routing tables on multiple nodes simultaneously."
-            f"\nOutput ONLY one line: NodeA->NodeB->NodeC"
+            f"\nCRITICAL: You must trace EVERY hop. Do NOT skip intermediate nodes."
+            f"\nStep 1: On {source}, query `display ip routing-table` + `display current-configuration`."
+            f"\nStep 2: In routing table, find the route matching destination IP -> get next-hop IP + egress interface."
+            f"\nStep 3: In config, find the egress interface's `description` field -> get next-hop DEVICE NAME."
+            f"\n  Example: description From_NodeA_GE1/0/2_To_NodeB_GE1/0/6 -> next hop is NodeB"
+            f"\nStep 4: Repeat Steps 1-3 on the next device until route is 'Direct'."
+            f"\nOutput ONLY one line: NodeA->NodeB->...->NodeZ"
         )
         return hint
 
@@ -487,6 +492,80 @@ def call_noc_api(device_name: str, command: str, question_number: int) -> dict:
         return {"error": str(e)}
 
 
+def compress_tool_result(result_str: str, command: str) -> str:
+    """대형 tool result를 압축하여 컨텍스트 절약.
+
+    라우팅 테이블, 설정 파일 등 큰 출력을 핵심 정보만 남기고 축약.
+    """
+    # 작은 결과는 그대로 반환
+    if len(result_str) < 3000:
+        return result_str
+
+    try:
+        data = json.loads(result_str)
+        output = data.get("result", "")
+    except (json.JSONDecodeError, AttributeError):
+        output = result_str
+
+    lines = output.split('\n')
+
+    # display current-configuration → interface + description + ip address + static route만 추출
+    if "current-configuration" in command or "running-config" in command:
+        kept = []
+        in_interface = False
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("interface ") or stripped.startswith("description "):
+                kept.append(line)
+                in_interface = True
+            elif stripped.startswith("ip address ") or stripped.startswith("ip route-static "):
+                kept.append(line)
+            elif stripped.startswith("undo shutdown") or stripped.startswith("shutdown"):
+                kept.append(line)
+            elif stripped == "#" and in_interface:
+                kept.append(line)
+                in_interface = False
+            elif any(k in stripped for k in [
+                "ospf", "bgp", "vxlan", "vlan", "bridge-domain", "evpn",
+                "nve", "vbdif", "Vlanif", "Eth-Trunk", "loopback",
+                "isis", "srv6", "segment-routing",
+            ]):
+                kept.append(line)
+
+        if kept:
+            compressed = '\n'.join(kept)
+            data_out = dict(data) if isinstance(data, dict) else {"result": ""}
+            data_out["result"] = compressed
+            data_out["_compressed"] = True
+            return json.dumps(data_out, ensure_ascii=False)
+
+    # display ip routing-table → 빈 줄 제거 + 헤더 축약
+    if "routing-table" in command or "ip route" in command:
+        # 빈 줄과 헤더 텍스트 제거, 라우팅 엔트리만 유지
+        kept = []
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            # 실제 라우팅 엔트리 (IP주소로 시작)
+            if stripped and stripped[0].isdigit():
+                kept.append(stripped)
+            # 헤더 라인은 최소한만 유지
+            elif any(k in stripped for k in ['Destinations', 'Routing Table']):
+                kept.append(stripped)
+        if kept:
+            compressed = '\n'.join(kept)
+            data_out = dict(data) if isinstance(data, dict) else {"result": ""}
+            data_out["result"] = compressed
+            data_out["_compressed"] = True
+            return json.dumps(data_out, ensure_ascii=False)
+
+    # 기본 truncation
+    if len(result_str) > 8000:
+        return result_str[:8000] + "\n... [TRUNCATED]"
+    return result_str
+
+
 # ============================================================
 # Tool Definitions
 # ============================================================
@@ -534,76 +613,82 @@ You solve problems by collecting device data via CLI commands and analyzing it.
 `execute_cli_command(device_name, command)` - Execute CLI on Huawei/Cisco/H3C devices.
 You can call multiple tools in parallel (different devices in one turn).
 
-## Command Reference (use ONLY these)
+## Command Priority (most useful first)
+1. `display current-configuration` - BEST: contains interface descriptions with remote node+port info
+2. `display ip routing-table` - routing entries (LARGE output ~3000 tokens)
+3. `display interface brief` - port UP/DOWN status
+4. `display ip interface brief` - IP addresses per interface
+5. `display lldp neighbor brief` - neighbor info (may return "No permission" on some nodes!)
+6. `display arp` - IP-MAC-port mapping
+7. `display logbuffer` - system logs (useful for fault diagnosis)
+8. `display vxlan tunnel` / `display bgp evpn all routing-table` - VXLAN/EVPN info (PJ area)
+9. Cisco equivalents: show running-config, show ip route, show interface brief, etc.
 
-### Huawei / H3C
-display current-configuration | display logbuffer | display lldp neighbor brief
-display interface brief | display ip interface brief | display ip routing-table
-display arp | display ipv6 neighbors | display ospf peer | display ospf routing
-display ospf lsdb | display bgp evpn all routing-table | display bgp vpnv4 all routing-table
-display vxlan tunnel | display vrrp verbose | display bfd session all
-display srv6-te policy status | display segment-routing ipv6 local-sid end forwarding
-
-### Cisco
-show running-config | show logging | show lldp neighbors
-show ip interface brief | show interface brief | show ip route | show ip arp
-show ip ospf neighbor | show ip route ospf | show ip ospf database
-show bgp l2vpn evpn | show bgp vpnv4 unicast all
-show nve vni | show nve peers | show vrrp detail | show bfd neighbors
-
-### H3C-specific differences
-display lldp neighbor-information (not neighbor brief) | display arp all (not arp)
+## KEY DISCOVERY: Interface Descriptions
+In `display current-configuration`, each interface has a `description` field:
+```
+interface GE1/0/1
+ description From_NodeA_GE1/0/1_To_NodeB_GE1/0/2
+```
+This tells you EXACTLY which remote device and port is connected. Parse this to identify neighbors.
+This is MORE RELIABLE than LLDP (which may be unavailable on some nodes).
 
 ## Problem-Solving Strategies
 
 ### TYPE 1: Topology Reconstruction
 Goal: Restore link info for a target node's UP interfaces.
 Strategy:
-1. If you CAN query the target node: `display lldp neighbor brief` + `display interface brief`
-2. If you CANNOT query the target node (stated in question):
-   - Query LLDP on ALL listed neighbor nodes to find links to target
-   - For each neighbor: `display lldp neighbor brief` → look for target node entries
-   - If LLDP is empty on a neighbor, use fallback: check `display interface brief` for UP ports, then cross-reference with `display arp` and target node's ARP
-3. Output format: `TargetNode(port)->PeerNode(port)` per line, no extra text
+1. Query `display interface brief` on target → list UP ports (GE*/0/* with "up" status)
+2. Query `display current-configuration` on target → parse description for each UP port
+   - Pattern: `From_TargetNode_PortA_To_RemoteNode_PortB`
+3. If target CANNOT be queried: query `display lldp neighbor brief` on ALL neighbors simultaneously
+   - If LLDP returns "No permission" or empty: query `display current-configuration` on that neighbor instead
+   - Look for descriptions pointing to the target node
+4. Output format: `TargetNode(port)->PeerNode(port)` per line
 
 ### TYPE 2: Path Query
 Goal: Find forwarding path from source to destination IP.
+CRITICAL: You must trace EVERY hop. Do NOT skip intermediate nodes.
 Strategy:
-1. Get destination IP from `display ip interface brief` on destination node
-2. On source node: `display ip routing-table` → find matching route → next-hop IP
-3. Identify next-hop device: check `display ip interface brief` on candidate devices
-4. Repeat hop-by-hop until destination is directly connected
-5. Output format: `NodeA->NodeB->NodeC` single line, no extra text
+1. First turn: query `display ip routing-table` + `display current-configuration` on source node
+2. In routing table, find the route matching destination IP → get next-hop IP and egress interface
+3. In config, find the egress interface's description → get next-hop DEVICE NAME
+4. Repeat for each hop: query routing-table + config on the next device
+5. Stop when routing table shows "Direct" for the destination subnet
+6. For same-subnet destinations (VXLAN/L2): check VXLAN tunnel + BGP EVPN for overlay path
+7. Output: `NodeA->NodeB->NodeC->...->NodeZ` single line
 
 ### TYPE 3: Fault Localization
 Goal: Diagnose traffic interruption cause.
 Strategy:
-1. Start from source node: `display ip routing-table` for destination route
-2. Trace hop-by-hop, checking each node's routing table
-3. Check for: missing routes, blackhole routes, incorrect static routes, shutdown ports
-4. Use `display current-configuration` to verify static route config
-5. Use `display interface brief` to check port status (UP/DOWN/AdminDOWN)
-6. Routing faults: `node;dest-IP;cause` | Port faults: `node;port;cause`
+1. Query ALL suspect nodes simultaneously: `display ip routing-table` + `display interface brief` + `display current-configuration`
+2. For routing faults: compare routing tables - if a route exists on adjacent nodes but is MISSING on a suspect → "missing static route"
+3. For port faults: check `display interface brief` for *down or AdminDOWN ports
+4. For config faults: check `display current-configuration` for:
+   - Static routes pointing to wrong next-hop → "static route error"
+   - Blackhole routes (no next-hop) → "blackhole route"
+   - Interface IP mismatches → "interface IP error"
+   - Shutdown interfaces → "shutdown"
+5. For MAC/ARP issues: check `display logbuffer` for ARP_DUPLICATE_IPADDR → "MAC address configuration error"
+6. For advanced issues: check OSPF/BGP config, MTU values, VPN settings
+7. Output: `node;dest-IP;cause` (routing) or `node;port;cause` (port) per line
 
 ## CRITICAL RULES
-1. **Efficiency**: Batch multiple tool calls in ONE turn when possible (e.g., query LLDP on 4 nodes simultaneously)
+1. **Efficiency**: Batch multiple tool calls in ONE turn (e.g., query 4 nodes simultaneously)
 2. **No redundancy**: Never query the same device+command twice
-3. **Format compliance**: Output ONLY the final answer in the EXACT format the question requires
-4. **No explanation**: Do NOT include reasoning, analysis, or extra text in the answer
+3. **Description is key**: Always parse interface descriptions to identify connected devices
+4. **Trace ALL hops**: For path queries, never stop until you reach a Direct route
 5. **Time awareness**: You have 10 minutes. If data is sufficient, answer immediately
-6. **Error handling**: If a command returns error/empty, try alternative commands or skip
-7. **Vendor detection**: Determine vendor from device name patterns or question context
 
 ## OUTPUT FORMAT RULES (ABSOLUTE - NEVER VIOLATE)
 - Your final message must contain ONLY the answer lines, nothing else
-- Do NOT start with "Based on...", "Here is...", "The answer is...", or any preamble
-- Do NOT add explanations, summaries, or analysis after the answer
-- Do NOT number the lines (1., 2., etc.) unless the question explicitly requires it
-- For topology: each line is `TargetNode(port)->PeerNode(port)` and NOTHING else
-- For path: single line `NodeA->NodeB->NodeC` and NOTHING else
-- For fault: each line is `node;target;cause` and NOTHING else
-- No blank lines at start or end
-- No trailing spaces or extra whitespace
+- Do NOT start with "Based on...", "Here is...", "The answer is..." or any preamble
+- Do NOT add explanations, summaries, or analysis
+- Do NOT number lines unless the question requires it
+- Topology: `TargetNode(port)->PeerNode(port)` per line
+- Path: single line `NodeA->NodeB->...->NodeZ`
+- Fault: `node;target;cause` per line
+- No blank lines, no trailing spaces
 """
 
 
@@ -893,9 +978,7 @@ def run_agent(question_id: int, question_text: str) -> dict:
 
                 result = call_noc_api(device, command, question_id)
                 result_str = json.dumps(result, ensure_ascii=False)
-
-                if len(result_str) > 12000:
-                    result_str = result_str[:12000] + "\n... [TRUNCATED]"
+                result_str = compress_tool_result(result_str, command)
 
                 messages.append({
                     "role": "tool",
@@ -983,8 +1066,7 @@ def run_agent(question_id: int, question_text: str) -> dict:
                             log.info(f"  [Q{question_id}] Tool #{tool_calls_count} (recovery): {device} -> {command}")
                             result = call_noc_api(device, command, question_id)
                             result_str = json.dumps(result, ensure_ascii=False)
-                            if len(result_str) > 12000:
-                                result_str = result_str[:12000] + "\n... [TRUNCATED]"
+                            result_str = compress_tool_result(result_str, command)
                             messages.append({"role": "tool", "tool_call_id": tc.id, "content": result_str})
                         empty_count = 0
                         continue
