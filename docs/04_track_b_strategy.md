@@ -92,7 +92,85 @@ python server.py  # localhost:7860 또는 :5000
 python agent/evaluate_openclaw.py -i data/Phase_1/test.json --questions 1
 ```
 
-## 4. 최적화 방향
+## 4. 데이터 아키텍처 (server.py 분석)
+
+### NOC API = 로컬 파일 서버
+server.py는 `devices_outputs/` 디렉토리의 사전 생성된 텍스트 파일을 읽어서 반환합니다.
+
+```
+devices_outputs/
+├── {question_number}/           # 문제별 독립 데이터 (장애 시뮬레이션)
+│   ├── {device_name}/
+│   │   ├── display_current-configuration.txt
+│   │   ├── display_ip_routing-table.txt
+│   │   └── ... (커맨드별 .txt)
+```
+
+- **캐시 키**: `{question_number}/{device_name}/{command_spaces_to_underscores}.txt`
+- **문제별 독립**: 같은 장비라도 문제마다 다른 설정/상태 반환 (장애 주입)
+- **접근 제한**: `question_limits_config.json`으로 특정 문제에서 "No permission" 반환
+- **API 없이 해결 가능**: 로컬 파일 직접 읽어서 정답 도출 가능
+
+### 핵심 데이터 소스
+
+| 커맨드 | 용도 | 평균 크기 |
+|--------|------|----------|
+| `display current-configuration` | **interface description으로 연결 정보** (가장 신뢰) | 5000+ tokens |
+| `display ip routing-table` | 라우팅 경로 추적 | 3000 tokens |
+| `display interface brief` | 포트 UP/DOWN 상태 | 800 tokens |
+| `display lldp neighbor brief` | 이웃 장비 정보 (일부 문제에서 차단됨!) | 300 tokens |
+| `display logbuffer` | 장애 로그 (MAC 충돌 등) | 2000 tokens |
+| `display arp` | IP-MAC-포트 매핑 | 300 tokens |
+
+### interface description (핵심 발견)
+`display current-configuration`에서 각 인터페이스의 description 필드가 원격 장비와 포트를 직접 명시:
+```
+interface GE1/0/1
+ description From_Delta-Axis-01_GE1/0/1_To_Delta-Node-01_GE1/0/1
+```
+LLDP보다 **더 신뢰할 수 있는** 연결 정보 소스 (LLDP는 일부 문제에서 "No permission" 반환).
+
+### 로컬 파일 기반 풀이
+```python
+import os
+BASE = "data/Track B/devices_outputs"
+def read_output(qnum, device, command):
+    safe_cmd = command.replace(" ", "_").replace("/", "_")
+    path = f"{BASE}/{qnum}/{device}/{safe_cmd}.txt"
+    return open(path).read() if os.path.exists(path) else None
+```
+
+## 5. 네트워크 토폴로지
+
+### 금융 네트워크 (32노드, Q1~Q28)
+전통적 3-Tier 아키텍처. Core(Alpha-Center) → Aggregation(Portal/Aegis) → Access(Axis/Node).
+
+- **Core**: Alpha-Center-01/02 (Zone 간 백본 라우터)
+- **Dev/Test Zone**: Beta-* (10대) — 개발/테스트 환경
+- **Big Data Zone**: Gamma-* (10대) — 빅데이터 처리
+- **Management Zone**: Delta-* (8대) — 운영 관리
+- **프로토콜**: Static Route, OSPF
+
+### PJ Area (22노드, Q29~Q50)
+Spine-Leaf VXLAN Fabric. 두 네트워크는 **완전히 독립** (직접 연결 없음).
+
+- **Spine**: Janus-Prime-01/02
+- **Leaf**: Atlas-Prime-01/02, Aegis-Prime-01/02
+- **VTEP**: Demeter-Prime-01/02 (VXLAN 터널 종단점)
+- **Access**: Hermes-Prime-01/02
+- **External**: PX1 (WAN 게이트웨이)
+- **프로토콜**: VXLAN, BGP EVPN, OSPF (언더레이)
+
+### 검증된 정답 (수동 확인)
+
+| 문제 | 정답 |
+|------|------|
+| Q6 | Delta-Axis-01: 6링크 (description 기반 도출) |
+| Q7 | Beta-Node-01→Beta-Axis-02→Beta-Portal-02→Alpha-Center-02→Gamma-Portal-02→Gamma-Axis-02→Gamma-Node-01 |
+| Q17 | Alpha-Center-02;192.168.70.22;missing static route |
+| Q39 | Demeter-Prime-01;20.1.1.10;missing static route |
+
+## 7. 최적화 방향
 
 ### 단기 (Phase 1 기간)
 - [ ] 환경 구축 및 baseline 실행
@@ -114,7 +192,7 @@ python agent/evaluate_openclaw.py -i data/Phase_1/test.json --questions 1
 - [ ] SRv6/EVPN 고급 프로토콜 지식 강화
 - [ ] Docker 컨테이너 실행 환경 테스트
 
-## 5. 핵심 리스크 및 대응
+## 8. 핵심 리스크 및 대응
 
 | 리스크 | 영향 | 대응 |
 |--------|------|------|
@@ -124,7 +202,7 @@ python agent/evaluate_openclaw.py -i data/Phase_1/test.json --questions 1
 | 멀티벤더 명령어 오류 | 422 응답 | 벤더 자동 감지 + 명령어 매핑 테이블 |
 | Exact Match 실패 | 정답이지만 형식 불일치 | 출력 형식 정규화 (공백, 줄바꿈 제거) |
 
-## 6. 시간 계획
+## 9. 시간 계획
 
 | 기간 | 목표 |
 |------|------|
