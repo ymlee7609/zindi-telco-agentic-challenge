@@ -1,0 +1,128 @@
+direction: down
+
+Core: Core {
+  Alpha_Center_01: Alpha-Center-01\nHuawei CE12800\n(Core Router)
+  Alpha_Center_02: Alpha-Center-02\nHuawei CE12800\n(Core Router)
+}
+
+Big Data Zone: Big Data Zone {
+  Gamma_Portal_01: Gamma-Portal-01\nHuawei CE12800\n(Aggregation)
+  Gamma_Portal_02: Gamma-Portal-02\nHuawei CE12800\n(Aggregation)
+  Gamma_Aegis_01: Gamma-Aegis-01\nHuawei CE12800\n(Firewall/Security)
+  Gamma_Aegis_02: Gamma-Aegis-02\nHuawei CE12800\n(Firewall/Security)
+  Gamma_Axis_01: Gamma-Axis-01\nHuawei CE12800\n(Access Switch)
+  Gamma_Axis_02: Gamma-Axis-02\nHuawei CE12800\n(Access Switch)
+  Gamma_Node_01: Gamma-Node-01\nHuawei CE12800\n(Server/Host)
+  Gamma_Node_02: Gamma-Node-02\nHuawei CE12800\n(Server/Host)
+  Gamma_Node_03: Gamma-Node-03\nHuawei CE12800\n(Server/Host)
+  Gamma_Node_04: Gamma-Node-04\nHuawei CE12800\n(Server/Host)
+}
+
+Dev_Test Zone: Dev/Test Zone {
+  Beta_Portal_01: Beta-Portal-01\nHuawei CE12800\n(Aggregation)
+  Beta_Portal_02: Beta-Portal-02\nHuawei CE12800\n(Aggregation)
+  Beta_Aegis_01: Beta-Aegis-01\nHuawei CE12800\n(Firewall/Security)
+  Beta_Aegis_02: Beta-Aegis-02\nHuawei CE12800\n(Firewall/Security)
+  Beta_Axis_01: Beta-Axis-01\nHuawei CE12800\n(Access Switch)
+  Beta_Axis_02: Beta-Axis-02\nHuawei CE12800\n(Access Switch)
+  Beta_Node_01: Beta-Node-01\nHuawei CE12800\n(Server/Host)
+  Beta_Node_02: Beta-Node-02\nHuawei CE12800\n(Server/Host)
+  Beta_Node_03: Beta-Node-03\nHuawei CE12800\n(Server/Host)
+  Beta_Node_04: Beta-Node-04\nHuawei CE12800\n(Server/Host)
+}
+
+Management Zone: Management Zone {
+  Delta_Portal_01: Delta-Portal-01\nHuawei CE12800\n(Aggregation)
+  Delta_Portal_02: Delta-Portal-02\nHuawei CE12800\n(Aggregation)
+  Delta_Axis_01: Delta-Axis-01\nHuawei CE12800\n(Access Switch)
+  Delta_Axis_02: Delta-Axis-02\nHuawei CE12800\n(Access Switch)
+  Delta_Node_01: Delta-Node-01\nHuawei CE12800\n(Server/Host)
+  Delta_Node_02: Delta-Node-02\nHuawei CE12800\n(Server/Host)
+  Delta_Node_03: Delta-Node-03\nHuawei CE12800\n(Server/Host)
+  Delta_Node_04: Delta-Node-04\nHuawei CE12800\n(Server/Host)
+}
+
+# === Links ===
+Big Data Zone.Gamma_Portal_01 -> Big Data Zone.Gamma_Axis_01: GE1/0/1 -- GE1/0/5
+Big Data Zone.Gamma_Portal_01 -> Big Data Zone.Gamma_Axis_02: GE1/0/2 -- GE1/0/5
+Big Data Zone.Gamma_Portal_01 -> Big Data Zone.Gamma_Portal_02: GE1/0/3 -- GE1/0/3
+Big Data Zone.Gamma_Portal_01 -> Big Data Zone.Gamma_Aegis_01: GE1/0/4 -- GE0/0/0
+Big Data Zone.Gamma_Portal_01 -> Big Data Zone.Gamma_Aegis_02: GE1/0/5 -- GE0/0/0
+Big Data Zone.Gamma_Portal_01 -> Core.Alpha_Center_01: GE1/0/6 -- GE1/0/5
+Big Data Zone.Gamma_Portal_01 -> Core.Alpha_Center_02: GE1/0/7 -- GE1/0/5
+Big Data Zone.Gamma_Portal_02 -> Big Data Zone.Gamma_Axis_01: GE1/0/1 -- GE1/0/6
+Big Data Zone.Gamma_Portal_02 -> Big Data Zone.Gamma_Axis_02: GE1/0/2 -- GE1/0/6
+Big Data Zone.Gamma_Portal_02 -> Big Data Zone.Gamma_Aegis_01: GE1/0/4 -- GE0/0/1
+Big Data Zone.Gamma_Portal_02 -> Big Data Zone.Gamma_Aegis_02: GE1/0/5 -- GE0/0/1
+Big Data Zone.Gamma_Portal_02 -> Core.Alpha_Center_01: GE1/0/6 -- GE1/0/6
+Big Data Zone.Gamma_Portal_02 -> Core.Alpha_Center_02: GE1/0/7 -- GE1/0/6
+Big Data Zone.Gamma_Aegis_01 -> Big Data Zone.Gamma_Portal_01: GE1/0/0 -- GE1/0/4
+Big Data Zone.Gamma_Aegis_01 -> Big Data Zone.Gamma_Portal_02: GE1/0/1 -- GE1/0/4
+Big Data Zone.Gamma_Aegis_01 -> Big Data Zone.Gamma_Aegis_02: GE1/0/2 -- GE0/0/2
+Big Data Zone.Gamma_Aegis_02 -> Big Data Zone.Gamma_Portal_01: GE1/0/0 -- GE1/0/5
+Big Data Zone.Gamma_Aegis_02 -> Big Data Zone.Gamma_Portal_02: GE1/0/1 -- GE1/0/5
+Big Data Zone.Gamma_Aegis_02 -> Big Data Zone.Gamma_Aegis_01: GE1/0/2 -- GE0/0/2
+Big Data Zone.Gamma_Axis_01 -> Big Data Zone.Gamma_Node_01: GE1/0/1 -- GE1/0/1
+Big Data Zone.Gamma_Axis_01 -> Big Data Zone.Gamma_Node_02: GE1/0/2 -- GE1/0/1
+Big Data Zone.Gamma_Axis_01 -> Big Data Zone.Gamma_Node_03: GE1/0/3 -- GE1/0/1
+Big Data Zone.Gamma_Axis_01 -> Big Data Zone.Gamma_Node_04: GE1/0/4 -- GE1/0/1
+Big Data Zone.Gamma_Axis_02 -> Big Data Zone.Gamma_Node_01: GE1/0/1 -- GE1/0/2
+Big Data Zone.Gamma_Axis_02 -> Big Data Zone.Gamma_Node_02: GE1/0/2 -- GE1/0/2
+Big Data Zone.Gamma_Axis_02 -> Big Data Zone.Gamma_Node_03: GE1/0/3 -- GE1/0/2
+Big Data Zone.Gamma_Axis_02 -> Big Data Zone.Gamma_Node_04: GE1/0/4 -- GE1/0/2
+Big Data Zone.Gamma_Node_01 -> Big Data Zone.Gamma_Node_02: GE1/0/3 -- GE1/0/3
+Big Data Zone.Gamma_Node_03 -> Big Data Zone.Gamma_Node_04: GE1/0/3 -- GE1/0/3
+Dev_Test Zone.Beta_Portal_01 -> Dev_Test Zone.Beta_Axis_01: GE1/0/1 -- GE1/0/5
+Dev_Test Zone.Beta_Portal_01 -> Dev_Test Zone.Beta_Axis_02: GE1/0/2 -- GE1/0/5
+Dev_Test Zone.Beta_Portal_01 -> Dev_Test Zone.Beta_Portal_02: GE1/0/3 -- GE1/0/3
+Dev_Test Zone.Beta_Portal_01 -> Dev_Test Zone.Beta_Aegis_01: GE1/0/4 -- GE0/0/0
+Dev_Test Zone.Beta_Portal_01 -> Dev_Test Zone.Beta_Aegis_02: GE1/0/5 -- GE0/0/0
+Dev_Test Zone.Beta_Portal_01 -> Core.Alpha_Center_01: GE1/0/6 -- GE1/0/1
+Dev_Test Zone.Beta_Portal_01 -> Core.Alpha_Center_02: GE1/0/7 -- GE1/0/1
+Dev_Test Zone.Beta_Portal_02 -> Dev_Test Zone.Beta_Axis_01: GE1/0/1 -- GE1/0/6
+Dev_Test Zone.Beta_Portal_02 -> Dev_Test Zone.Beta_Axis_02: GE1/0/2 -- GE1/0/6
+Dev_Test Zone.Beta_Portal_02 -> Dev_Test Zone.Beta_Aegis_01: GE1/0/4 -- GE0/0/1
+Dev_Test Zone.Beta_Portal_02 -> Dev_Test Zone.Beta_Aegis_02: GE1/0/5 -- GE0/0/1
+Dev_Test Zone.Beta_Portal_02 -> Core.Alpha_Center_01: GE1/0/6 -- GE1/0/2
+Dev_Test Zone.Beta_Portal_02 -> Core.Alpha_Center_02: GE1/0/7 -- GE1/0/2
+Dev_Test Zone.Beta_Aegis_01 -> Dev_Test Zone.Beta_Portal_01: GE1/0/0 -- GE1/0/4
+Dev_Test Zone.Beta_Aegis_01 -> Dev_Test Zone.Beta_Portal_02: GE1/0/1 -- GE1/0/4
+Dev_Test Zone.Beta_Aegis_01 -> Dev_Test Zone.Beta_Aegis_02: GE1/0/2 -- GE0/0/2
+Dev_Test Zone.Beta_Aegis_02 -> Dev_Test Zone.Beta_Portal_01: GE1/0/0 -- GE1/0/5
+Dev_Test Zone.Beta_Aegis_02 -> Dev_Test Zone.Beta_Portal_02: GE1/0/1 -- GE1/0/5
+Dev_Test Zone.Beta_Aegis_02 -> Dev_Test Zone.Beta_Aegis_01: GE1/0/2 -- GE0/0/2
+Dev_Test Zone.Beta_Axis_01 -> Dev_Test Zone.Beta_Node_01: GE1/0/1 -- GE1/0/1
+Dev_Test Zone.Beta_Axis_01 -> Dev_Test Zone.Beta_Node_02: GE1/0/2 -- GE1/0/1
+Dev_Test Zone.Beta_Axis_01 -> Dev_Test Zone.Beta_Node_03: GE1/0/3 -- GE1/0/1
+Dev_Test Zone.Beta_Axis_01 -> Dev_Test Zone.Beta_Node_04: GE1/0/4 -- GE1/0/1
+Dev_Test Zone.Beta_Axis_02 -> Dev_Test Zone.Beta_Node_01: GE1/0/1 -- GE1/0/2
+Dev_Test Zone.Beta_Axis_02 -> Dev_Test Zone.Beta_Node_02: GE1/0/2 -- GE1/0/2
+Dev_Test Zone.Beta_Axis_02 -> Dev_Test Zone.Beta_Node_03: GE1/0/3 -- GE1/0/2
+Dev_Test Zone.Beta_Axis_02 -> Dev_Test Zone.Beta_Node_04: GE1/0/4 -- GE1/0/2
+Dev_Test Zone.Beta_Node_01 -> Dev_Test Zone.Beta_Node_02: GE1/0/3 -- GE1/0/3
+Dev_Test Zone.Beta_Node_01 -> Dev_Test Zone.Beta_Node_02: GE1/0/4 -- GE1/0/4
+Dev_Test Zone.Beta_Node_03 -> Dev_Test Zone.Beta_Node_04: GE1/0/3 -- GE1/0/3
+Dev_Test Zone.Beta_Node_03 -> Dev_Test Zone.Beta_Node_04: GE1/0/4 -- GE1/0/4
+Management Zone.Delta_Portal_01 -> Management Zone.Delta_Axis_01: GE1/0/1 -- GE1/0/5
+Management Zone.Delta_Portal_01 -> Management Zone.Delta_Axis_02: GE1/0/2 -- GE1/0/5
+Management Zone.Delta_Portal_01 -> Management Zone.Delta_Portal_02: GE1/0/3 -- GE1/0/3
+Management Zone.Delta_Portal_01 -> Delta_Aegis_01: GE1/0/4 -- GE0/0/0
+Management Zone.Delta_Portal_01 -> Delta_Aegis_02: GE1/0/5 -- GE0/0/0
+Management Zone.Delta_Portal_01 -> Core.Alpha_Center_01: GE1/0/6 -- GE1/0/3
+Management Zone.Delta_Portal_01 -> Core.Alpha_Center_02: GE1/0/7 -- GE1/0/3
+Management Zone.Delta_Portal_02 -> Management Zone.Delta_Axis_01: GE1/0/1 -- GE1/0/6
+Management Zone.Delta_Portal_02 -> Management Zone.Delta_Axis_02: GE1/0/2 -- GE1/0/6
+Management Zone.Delta_Portal_02 -> Delta_Aegis_01: GE1/0/4 -- GE0/0/1
+Management Zone.Delta_Portal_02 -> Delta_Aegis_02: GE1/0/5 -- GE0/0/1
+Management Zone.Delta_Portal_02 -> Core.Alpha_Center_01: GE1/0/6 -- GE1/0/4
+Management Zone.Delta_Portal_02 -> Core.Alpha_Center_02: GE1/0/7 -- GE1/0/4
+Management Zone.Delta_Axis_01 -> Management Zone.Delta_Node_01: GE1/0/1 -- GE1/0/1
+Management Zone.Delta_Axis_01 -> Management Zone.Delta_Node_02: GE1/0/2 -- GE1/0/1
+Management Zone.Delta_Axis_01 -> Management Zone.Delta_Node_03: GE1/0/3 -- GE1/0/1
+Management Zone.Delta_Axis_01 -> Management Zone.Delta_Node_04: GE1/0/4 -- GE1/0/1
+Management Zone.Delta_Axis_02 -> Management Zone.Delta_Node_01: GE1/0/1 -- GE1/0/2
+Management Zone.Delta_Axis_02 -> Management Zone.Delta_Node_02: GE1/0/2 -- GE1/0/2
+Management Zone.Delta_Axis_02 -> Management Zone.Delta_Node_03: GE1/0/3 -- GE1/0/2
+Management Zone.Delta_Axis_02 -> Management Zone.Delta_Node_04: GE1/0/4 -- GE1/0/2
+Management Zone.Delta_Node_01 -> Management Zone.Delta_Node_02: GE1/0/3 -- GE1/0/3
+Management Zone.Delta_Node_03 -> Management Zone.Delta_Node_04: GE1/0/3 -- GE1/0/3

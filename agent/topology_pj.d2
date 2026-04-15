@@ -1,0 +1,60 @@
+direction: down
+
+Spine: Spine Layer {
+  Janus_Prime_01: Janus-Prime-01\nHuawei CE12800\n(Spine Switch)
+  Janus_Prime_02: Janus-Prime-02\nHuawei CE12800\n(Spine Switch)
+}
+
+Leaf: Leaf Layer {
+  Atlas_Prime_01: Atlas-Prime-01\nHuawei CE12800\n(Leaf Switch)
+  Atlas_Prime_02: Atlas-Prime-02\nHuawei CE12800\n(Leaf Switch)
+  Aegis_Prime_01: Aegis-Prime-01\nHuawei CE12800\n(Leaf Switch)
+  Aegis_Prime_02: Aegis-Prime-02\nHuawei CE12800\n(Leaf Switch)
+}
+
+VTEP: VTEP Layer {
+  Demeter_Prime_01: Demeter-Prime-01\nHuawei CE12800\n(VTEP/Leaf-Edge)
+  Demeter_Prime_02: Demeter-Prime-02\nHuawei CE12800\n(VTEP/Leaf-Edge)
+}
+
+Access: Access Layer {
+  Hermes_Prime_01: Hermes-Prime-01\nHuawei CE12800\n(Access Switch)
+  Hermes_Prime_02: Hermes-Prime-02\nHuawei CE12800\n(Access Switch)
+}
+
+PJGFA: PJGFA Layer {
+  Janus_Node_01: Janus-Node-01\nHuawei CE12800\n(Spine (PJGFA))
+  Janus_Node_02: Janus-Node-02\nHuawei CE12800\n(Spine (PJGFA))
+  Atlas_Node_01: Atlas-Node-01\nHuawei CE12800\n(Leaf (PJGFA))
+  Atlas_Node_02: Atlas-Node-02\nHuawei CE12800\n(Leaf (PJGFA))
+  Aegis_Node_01: Aegis-Node-01\nHuawei CE12800\n(Leaf (PJGFA))
+  Demeter_Node_01: Demeter-Node-01\nHuawei CE12800\n(VTEP (PJGFA))
+  Demeter_Node_02: Demeter-Node-02\nHuawei CE12800\n(VTEP (PJGFA))
+  Hermes_Node_01: Hermes-Node-01\nHuawei CE12800\n(Access (PJGFA))
+  Hermes_Node_02: Hermes-Node-02\nHuawei CE12800\n(Access (PJGFA))
+}
+
+# === PJ Links ===
+VTEP.Demeter_Prime_02 -> Leaf.Atlas_Prime_01: GE1/0/0 -- GE1/0/3
+VTEP.Demeter_Prime_02 -> Leaf.Atlas_Prime_02: GE1/0/1 -- GE1/0/3
+VTEP.Demeter_Prime_02 -> Access.Hermes_Prime_02: GE1/0/5 -- GE1/0/4
+Leaf.Atlas_Prime_01 -> Spine.Janus_Prime_01: GE1/0/0 -- GE1/0/0
+Leaf.Atlas_Prime_01 -> Spine.Janus_Prime_02: GE1/0/1 -- GE1/0/0
+Leaf.Atlas_Prime_02 -> Spine.Janus_Prime_01: GE1/0/0 -- GE1/0/1
+Leaf.Atlas_Prime_02 -> Spine.Janus_Prime_02: GE1/0/1 -- GE1/0/1
+External.PX1: PX1
+Spine.Janus_Prime_01 -> External.PX1: GE1/0/2 -- GE1/0/0
+Spine.Janus_Prime_01 -> Leaf.Aegis_Prime_02: GE1/0/3 -- GigabitEthernet1/0/2
+Spine.Janus_Prime_01 -> Spine.Janus_Prime_02: GE1/0/4 -- GE1/0/4
+Spine.Janus_Prime_01 -> Leaf.Aegis_Prime_01: GE1/0/5 -- GigabitEthernet1/0/2
+Spine.Janus_Prime_02 -> Leaf.Aegis_Prime_01: GE1/0/5 -- GigabitEthernet1/0/0
+Access.Hermes_Prime_01 -> VTEP.Demeter_Prime_01: GE1/0/4 -- GE1/0/5
+PJGFA.Janus_Node_01 -> PJGFA.Atlas_Node_01: GE1/0/2 -- GE1/0/1
+PJGFA.Janus_Node_01 -> PJGFA.Atlas_Node_02: GE1/0/3 -- GE1/0/1
+PJGFA.Janus_Node_01 -> PJGFA.Aegis_Node_01: GE1/0/4 -- GigabitEthernet1/0/3
+VTEP.Demeter_Prime_01 -> Access.Hermes_Prime_01: GE1/0/5 -- GE1/0/4
+VTEP.Demeter_Prime_01 -> Leaf.Atlas_Prime_01: GE1/0/0 -- GE1/0/2
+VTEP.Demeter_Prime_01 -> Leaf.Atlas_Prime_02: GE1/0/1 -- GE1/0/2
+PJGFA.Janus_Node_01 -> PJGFA.Janus_Node_02: GE1/0/5 -- GE1/0/5
+PJGFA.Demeter_Node_01 -> PJGFA.Hermes_Node_01: GE1/0/5 -- GE1/0/4
+PJGFA.Demeter_Node_02 -> PJGFA.Hermes_Node_02: GE1/0/5 -- GE1/0/4
