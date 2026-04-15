@@ -1,0 +1,9 @@
+{"question_id": 2, "answer": "", "tool_calls": 0, "duration_s": 31.2, "iterations": 30, "status": "max_iterations", "qtype": "topology"}
+{"question_id": 2, "answer": "", "tool_calls": 0, "duration_s": 30.4, "iterations": 30, "status": "max_iterations", "qtype": "topology"}
+{"question_id": 2, "answer": "", "tool_calls": 9, "duration_s": 38.1, "iterations": 30, "status": "max_iterations", "qtype": "topology"}
+{"question_id": 2, "answer": "", "tool_calls": 0, "duration_s": 31.3, "iterations": 30, "status": "max_iterations", "qtype": "topology"}
+{"question_id": 2, "answer": "", "tool_calls": 0, "duration_s": 31.4, "iterations": 30, "status": "max_iterations", "qtype": "topology"}
+{"question_id": 2, "answer": "", "tool_calls": 0, "duration_s": 31.0, "iterations": 30, "status": "max_iterations", "qtype": "topology"}
+{"question_id": 2, "answer": "Gamma-Axis-02(GE1/0/2)->Gamma-Portal-01(GE1/0/2)\nGamma-Axis-02(GE1/0/2)->Gamma-Portal-02(GE1/0/2)\nGamma-Axis-02(GE1/0/3)->Gamma-Node-01(GE1/0/2)\nGamma-Axis-02(GE1/0/3)->Gamma-Node-02(GE1/0/2)\nGamma-Axis-02(GE1/0/4)->Gamma-Node-03(GE1/0/2)\nGamma-Axis-02(GE1/0/4)->Gamma-Node-04(GE1/0/2)", "tool_calls": 9, "duration_s": 13.0, "iterations": 2, "status": "solved", "qtype": "topology"}
+{"question_id": 7, "answer": "Beta-Node-01->Gamma-Node-01", "tool_calls": 4, "duration_s": 163.3, "iterations": 7, "status": "solved", "qtype": "path"}
+{"question_id": 39, "answer": "Hermes-Prime-01;20.1.1.10;missing static route", "tool_calls": 3, "duration_s": 27.9, "iterations": 2, "status": "solved", "qtype": "fault"}
