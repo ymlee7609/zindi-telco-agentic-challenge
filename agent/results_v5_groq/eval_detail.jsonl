@@ -3,3 +3,8 @@
 {"question_id": 4, "answer": "Beta-Portal-02(GE1/0/1)->Alpha-Center-01(GE1/0/1)\nBeta-Portal-02(GE1/0/2)->Alpha-Center-02(GE1/0/2)\nBeta-Portal-02(GE1/0/3)->Alpha-Center-03(GE1/0/3)\nBeta-Portal-02(GE1/0/4)->Alpha-Center-04(GE1/0/4)\nBeta-Portal-02(GE1/0/5)->Alpha-Center-05(GE1/0/5)\nBeta-Portal-02(GE1/0/6)->Alpha-Center-06(GE1/0/6)\nBeta-Portal-02(GE1/0/7)->Alpha-Center-07(GE1/0/7)", "tool_calls": 7, "duration_s": 63.4, "iterations": 3, "status": "solved", "qtype": "topology"}
 {"question_id": 5, "answer": "Delta-Node-01(GE1/0/1)->Delta-Axis-01(GE1/0/1)\nDelta-Node-01(GE1/0/2)->Delta-Axis-02(GE1/0/1)\nDelta-Node-01(GE1/0/3)->Delta-Node-02(GE1/0/3)", "tool_calls": 5, "duration_s": 46.4, "iterations": 4, "status": "solved", "qtype": "topology"}
 {"question_id": 6, "answer": "", "tool_calls": 2, "duration_s": 39.4, "iterations": 30, "status": "max_iterations", "qtype": "topology"}
+{"question_id": 29, "answer": "", "tool_calls": 0, "duration_s": 31.0, "iterations": 30, "status": "max_iterations", "qtype": "topology"}
+{"question_id": 30, "answer": "", "tool_calls": 0, "duration_s": 30.8, "iterations": 30, "status": "max_iterations", "qtype": "topology"}
+{"question_id": 31, "answer": "", "tool_calls": 0, "duration_s": 30.8, "iterations": 30, "status": "max_iterations", "qtype": "topology"}
+{"question_id": 32, "answer": "", "tool_calls": 0, "duration_s": 30.8, "iterations": 30, "status": "max_iterations", "qtype": "topology"}
+{"question_id": 33, "answer": "", "tool_calls": 0, "duration_s": 30.8, "iterations": 30, "status": "max_iterations", "qtype": "topology"}
