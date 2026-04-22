@@ -44,6 +44,9 @@
 - [x] **Q38 Qwen 재실행** → XML 오염 재발로 Qwen 자체 한계 확인
 - [x] **PJ Path 품질 이슈 발견** (Q34/35/37 도 환각·포맷 문제)
 - [x] **Q34~Q38 Opus 일괄 풀이** → `submission_v6_full_v4.csv` 생성 (best-effort)
+- [x] **Qwen P0/P1/P2 개선안 구현** (topology snapshot, resolve_ip_to_device tool, few-shot, answer validation)
+- [x] **Q34~Q38 Qwen 재실행** (retry3): 3/5 Opus 일치, 2/5 더 정확한 physical path 도출
+- [x] **Zindi 제출 포맷 수정**: `id, prediction` 2-column → `submission_v6_full_v5.csv`, `v6.csv` 생성
 - [ ] 에이전트 최적화 (정확도 + 효율성)
 - [ ] Phase 2 제출
 

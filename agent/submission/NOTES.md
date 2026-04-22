@@ -1,5 +1,19 @@
 # Submission Notes
 
+> **[최종 확정] 2026-04-22 — 공식 submission_example.csv 기반 포맷**
+>
+> 공식 예시 파일 `agent/submission/submission_example.csv` 확인 결과, 올바른 포맷은:
+> - Header: **`ID, Track A, Track B`** (대문자 ID, 3-column)
+> - 550 scenario rows (Track A: 501 + Track B: 50)
+> - Track A 미참가 시 Track A 칸 공백, Track B 칸에 답 입력
+> - Track A 전용 scenario: 두 칸 모두 공백
+>
+> 이전 오해:
+> - v1~v4: `scenario_id, Track A, Track B` → `ID column missing` 에러 (header 이름 오류)
+> - v5~v6: `id, prediction` 2-column → guideline.md 의 local-eval 포맷을 제출 포맷으로 오해
+>
+> **v7 이상만 제출 가능**.
+
 ## Versions
 
 | File | 생성 | 설명 |
@@ -7,7 +21,10 @@
 | `submission_v6_full.csv` | 2026-04-21 | v6 full 실행 결과, 47 solved |
 | `submission_v6_full_v2.csv` | 2026-04-21 | Q11, Q36 을 v6_retry 결과로 덮어쓰기 (48 solved + Q36 타당 forced) |
 | `submission_v6_full_v3.csv` | 2026-04-22 | v2 베이스 + **Q38 Opus 에뮬레이션 경로** 반영 |
-| `submission_v6_full_v4.csv` | 2026-04-22 | v3 베이스 + **PJ Path Q34~Q37 Opus 에뮬레이션 일괄 재작성** (5문제 모두 overlay 4홉/3홉 형식으로 통일) |
+| `submission_v6_full_v4.csv` | 2026-04-22 | v3 베이스 + **PJ Path Q34~Q37 Opus 에뮬레이션 일괄 재작성** (3-column, 제출 불가) |
+| `submission_v6_full_v5.csv` | 2026-04-22 | **`id, prediction` 2-column 규격 준수** — Zindi 제출용. v6_full + Q11 retry + Q34~Q38 Opus v4 병합 |
+| `submission_v6_full_v6.csv` | 2026-04-22 | v5 베이스 + **Q36/Q37 retry3 P0/P1/P2 개선 결과** (super-spine physical path) 로 덮어쓰기 |
+| `submission_v6_full_v7.csv` | 2026-04-22 | **공식 example 포맷 준수** (`ID, Track A, Track B` 3-column, 550 rows) — Zindi 제출 최종본 |
 
 ## v3 에서 변경된 항목
 
@@ -62,9 +79,54 @@ Hermes-Prime-01->Demeter-Prime-01->Atlas-Prime-01->Janus-Prime-01->Aegis-Node-01
 
 ## 권장 제출
 
-- **1차 권장**: `submission_v6_full_v4.csv` (PJ Path 5문제 전부 Opus 에뮬레이션 정제)
-- **Fallback 1**: `submission_v6_full_v3.csv` (Q38만 교체, Q34/35/37은 Qwen 원본 유지)
-- **Fallback 2 (가장 보수)**: `submission_v6_full_v2.csv` (Qwen 원본, Q38 빈 답)
+- **제출**: **`submission_v6_full_v7.csv`** (유일한 올바른 포맷)
+- v1~v6 는 포맷 미스매치로 제출 불가 (로컬 기록용)
+
+## Submission 생성 Helper
+
+`agent/submission/generate_submission.py` 사용.
+
+```bash
+# 기본 + override 병합
+python agent/submission/generate_submission.py \
+  --results agent/results_v6_full/result.csv \
+  --override agent/results_v6_retry/result.csv \
+  --override agent/results_v6_retry3/result.csv \
+  --out agent/submission/submission_latest.csv
+```
+
+- 공식 `submission_example.csv` 의 550 row 순서 유지
+- 입력 `id, prediction` 2-column CSV 를 scenario_id 매핑해 Track B 칸에 채움
+- 중복 id 는 **후순위 override 가 승리**
+
+## v5 vs v6 차이 (Q36/Q37)
+
+| Q | v5 (Opus overlay) | v6 (retry3 physical) | 근거 |
+|---|-------------------|----------------------|------|
+| Q36 | `H-N-01->D-N-01->D-P-01->H-P-01` (4홉) | `H-N-01->D-N-01->A-N-01->J-N-01->G-N-01->E-N-01->Ae-P-01->H-P-01` (8홉) | LLDP BFS no-path, super-spine 경유 필요 |
+| Q37 | `H-N-01->D-N-01->H-N-02` (3홉) | `H-N-01->D-N-01->A-N-01->D-N-02->H-N-02` (5홉) | BFS LLDP 검증 경로 |
+
+Zindi 가 exact match 라면 한 쪽만 맞음. 평가자가 overlay/physical 어느 쪽 기대하는지 제출 결과로만 확인 가능.
+
+## 제출 규격 (Zindi 공식)
+
+출처: `agent/submission/submission_example.csv`
+
+```csv
+ID,Track A,Track B
+80e3aa96-815d-4683-980c-16db42eab0ef,,<track B answer or blank>
+...
+535afb0d-fa81-419b-9bcc-b456d032df5d,,"Gamma-Aegis-01(GE1/0/0)->..."
+```
+
+- **Headers**: `ID, Track A, Track B` (대문자 ID, 정확히 3 columns)
+- **ID**: scenario_id (UUID, test.json 의 `scenario_id`)
+- **Track A**: Track A 참가 시 답변, 미참가 시 공백
+- **Track B**: Track B 참가 시 답변, 미참가 시 공백
+- **Total rows**: 550 (Track A: 501 + Track B: 50)
+- multiline 답변은 `"..."` 로 quote
+
+참고: `data/Track B/agent/evaluate_openclaw_guideline.md` 의 `id, prediction` 포맷은 **로컬 evaluate_openclaw.py 의 per-Q 기록용** 이며 Zindi 업로드 포맷이 아님.
 
 ## 한계
 

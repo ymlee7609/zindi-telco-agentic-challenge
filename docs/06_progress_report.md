@@ -16,7 +16,11 @@
   - `agent/submission/submission_v6_full.csv` (v1, 47 solved)
   - `agent/submission/submission_v6_full_v2.csv` (v2, **48 solved** + Q36 타당 forced)
   - `agent/submission/submission_v6_full_v3.csv` (v3, v2 + **Q38 Opus 에뮬레이션 overlay 경로**, 2026-04-22)
-  - `agent/submission/submission_v6_full_v4.csv` (v4, v3 + **PJ Path Q34~Q37 Opus 일괄 재작성**, 2026-04-22)
+  - `agent/submission/submission_v6_full_v4.csv` (v4, v3 + **PJ Path Q34~Q37 Opus 일괄 재작성**, 2026-04-22, 3-column 로컬용)
+  - `agent/submission/submission_v6_full_v5.csv` (**v5, Zindi 규격 `id, prediction` 2-column**, 2026-04-22, 제출용)
+  - `agent/submission/submission_v6_full_v6.csv` (v6, Q36/Q37 retry3 physical path 반영, 2026-04-22, 로컬용)
+  - `agent/submission/submission_v6_full_v7.csv` (**v7, 공식 example `ID, Track A, Track B` 3-column 포맷 준수**, 2026-04-22, **최종 제출본**)
+  - `agent/submission/generate_submission.py` — 앞으로 submission 은 이 스크립트로 재생성 (공식 example schema 강제)
 - **완료 문서**: 문제 상세본 `docs/03-3-1_problems_detail.md` 신규 추가
 
 ---

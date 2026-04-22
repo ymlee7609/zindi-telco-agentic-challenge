@@ -1,0 +1,5 @@
+{"question_id": 34, "answer": "Hermes-Prime-01->Demeter-Prime-01->Hermes-Prime-02", "tool_calls": 4, "duration_s": 23.0, "iterations": 4, "status": "forced_answer", "qtype": "path"}
+{"question_id": 35, "answer": "Hermes-Prime-01->Demeter-Prime-01->Demeter-Node-01->Hermes-Node-01", "tool_calls": 6, "duration_s": 27.6, "iterations": 7, "status": "forced_answer", "qtype": "path"}
+{"question_id": 36, "answer": "Hermes-Node-01->Demeter-Node-01->Atlas-Node-01->Janus-Node-01->Gaia-Node-01->Eon-Node-01->Aegis-Prime-01->Hermes-Prime-01", "tool_calls": 22, "duration_s": 55.5, "iterations": 13, "status": "forced_answer", "qtype": "path"}
+{"question_id": 37, "answer": "Hermes-Node-01->Demeter-Node-01->Atlas-Node-01->Demeter-Node-02->Hermes-Node-02", "tool_calls": 4, "duration_s": 34.7, "iterations": 4, "status": "forced_answer", "qtype": "path"}
+{"question_id": 38, "answer": "Hermes-Prime-01->Demeter-Prime-01->Demeter-Node-02->Hermes-Node-02", "tool_calls": 21, "duration_s": 64.0, "iterations": 14, "status": "forced_answer", "qtype": "path"}

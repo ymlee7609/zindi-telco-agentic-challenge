@@ -302,6 +302,111 @@ def load_scenario_devices(question_id: int) -> list[str]:
         return []
 
 
+# [AUTO] Topology snapshot cache: scenario-wide LLDP graph + IP ownership map
+_TOPOLOGY_CACHE: dict[int, dict] = {}
+
+
+def build_topology_snapshot(question_id: int) -> dict:
+    """devices_outputs/{qid}/ 를 파싱해 LLDP 인접 그래프 + IP->device 맵 생성."""
+    if question_id in _TOPOLOGY_CACHE:
+        return _TOPOLOGY_CACHE[question_id]
+    qdir = _DEVICES_ROOT / str(question_id)
+    graph: dict = {"lldp": {}, "ip_owner": {}}
+    if not qdir.is_dir():
+        _TOPOLOGY_CACHE[question_id] = graph
+        return graph
+    device_name_re = re.compile(r'^[A-Za-z][A-Za-z0-9\-]*-(Prime|Node|Axis|Aegis|Portal|Center|Edge|Core)-\d+$')
+    for dev in sorted(qdir.iterdir()):
+        if not dev.is_dir() or dev.name.startswith("."):
+            continue
+        # LLDP neighbors
+        lldp_file = dev / "display_lldp_neighbor_brief.txt"
+        if lldp_file.exists():
+            try:
+                txt = lldp_file.read_text(errors="ignore")
+                # Neighbor Device column (last token per line) 또는 "Neighbor Device <name>"
+                candidates = set(re.findall(r'\b([A-Z][A-Za-z]+-[A-Z][A-Za-z]+-\d+)\b', txt))
+                candidates.discard(dev.name)
+                graph["lldp"][dev.name] = sorted(candidates)
+            except OSError:
+                graph["lldp"][dev.name] = []
+        # IP ownership from interface brief
+        brief_file = dev / "display_ip_interface_brief.txt"
+        if brief_file.exists():
+            try:
+                brief = brief_file.read_text(errors="ignore")
+                for m in re.finditer(r'(\d+\.\d+\.\d+\.\d+)/\d+', brief):
+                    ip = m.group(1)
+                    if ip.startswith("127.") or ip == "0.0.0.0":
+                        continue
+                    graph["ip_owner"].setdefault(ip, [])
+                    if dev.name not in graph["ip_owner"][ip]:
+                        graph["ip_owner"][ip].append(dev.name)
+            except OSError:
+                pass
+    _TOPOLOGY_CACHE[question_id] = graph
+    return graph
+
+
+def find_ip_owner(qid: int, ip: str) -> list[str]:
+    """IP 의 장비 소유자 리스트. 정확한 일치가 없으면 같은 /24 내 후보 반환."""
+    g = build_topology_snapshot(qid)
+    owners = g["ip_owner"].get(ip, [])
+    if owners:
+        return owners
+    # subnet /24 fallback
+    prefix = ".".join(ip.split(".")[:3]) + "."
+    return sorted({d for k, devs in g["ip_owner"].items() if k.startswith(prefix) for d in devs})
+
+
+def bfs_shortest_path(qid: int, src: str, dst: str, max_depth: int = 8) -> list[str]:
+    """LLDP 그래프 BFS로 src→dst 최단 경로 노드 리스트."""
+    g = build_topology_snapshot(qid)
+    if src not in g["lldp"] or dst not in g["lldp"]:
+        return []
+    if src == dst:
+        return [src]
+    from collections import deque
+    visited = {src}
+    queue = deque([(src, [src])])
+    while queue:
+        node, path = queue.popleft()
+        if len(path) > max_depth:
+            continue
+        for nb in g["lldp"].get(node, []):
+            if nb in visited:
+                continue
+            new_path = path + [nb]
+            if nb == dst:
+                return new_path
+            visited.add(nb)
+            queue.append((nb, new_path))
+    return []
+
+
+def validate_path_answer(answer: str, whitelist: set[str], qtype: str) -> tuple[bool, str, str]:
+    """경로 답 포맷/환각 검증. 반환: (ok, cleaned, reason)."""
+    # XML/tool-call/code-block 제거 후 첫 줄 추출
+    clean = re.sub(r'<[^>]+>', '', answer)
+    clean = re.sub(r'```[\s\S]*?```', '', clean)
+    clean = clean.strip()
+    if not clean:
+        return False, "", "empty answer"
+    first_line = clean.split("\n")[0].strip()
+    if qtype == QTYPE_PATH:
+        if "->" not in first_line:
+            return False, first_line, "no arrow (path requires hop1->hop2 form)"
+        hops = [h.strip() for h in first_line.split("->")]
+        if len(hops) < 2:
+            return False, first_line, f"only {len(hops)} hop"
+        for h in hops:
+            if re.fullmatch(r'\d+\.\d+\.\d+\.\d+', h):
+                return False, first_line, f"IP in hop: {h}"
+            if h not in whitelist:
+                return False, first_line, f"hallucinated device: {h}"
+    return True, first_line, "ok"
+
+
 def build_type_hint(qtype: str, question_text: str, question_id: int = 0) -> str:
     """질문 유형별 cold-start 힌트 생성 (user message로 주입)"""
     if qtype == QTYPE_TOPOLOGY:
@@ -371,6 +476,27 @@ def build_type_hint(qtype: str, question_text: str, question_id: int = 0) -> str
             f"\nLOOP GUARD: If you see [DUPLICATE-SKIPPED] in tool results, you are looping."
             f"\n  STOP exploring. Produce the BEST answer from data gathered so far, even if incomplete."
         )
+        # [AUTO] Pre-computed topology hints (P0: BFS shortest path + IP owner)
+        if question_id:
+            dest_target = dest_ip or dest_iface or dest
+            topology_hints = []
+            if dest_ip:
+                owners = find_ip_owner(question_id, dest_ip)
+                if owners:
+                    topology_hints.append(f"DEST IP {dest_ip} IS OWNED BY: {', '.join(owners)}")
+                    # BFS candidate path
+                    if source and owners:
+                        shortest = bfs_shortest_path(question_id, source, owners[0])
+                        if shortest:
+                            topology_hints.append(
+                                f"LLDP SHORTEST PATH CANDIDATE: {'->'.join(shortest)}"
+                            )
+            if topology_hints:
+                hint += "\n\nPRE-COMPUTED TOPOLOGY HINTS:\n  " + "\n  ".join(topology_hints)
+                hint += (
+                    "\n  VERIFY this candidate by querying routing-table on key hops,"
+                    " then OUTPUT the verified path. Prefer this over inventing new devices."
+                )
         # [AUTO] Default route + VRRP + empty-EVPN fallbacks (Q38 lessons)
         hint += (
             f"\n\nDEFAULT ROUTE FALLBACK:"
@@ -655,7 +781,28 @@ TOOLS = [
                 "required": ["device_name", "command"],
             },
         },
-    }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "resolve_ip_to_device",
+            "description": (
+                "Deterministically resolve an IP address to the device that owns it in this scenario. "
+                "Use this BEFORE guessing a device name from an IP. Returns the device(s) whose interface "
+                "holds the given IP. If no exact match, returns candidates sharing the same /24 subnet."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ip": {
+                        "type": "string",
+                        "description": "IPv4 address, e.g. '10.1.5.1' or '20.1.4.20'",
+                    },
+                },
+                "required": ["ip"],
+            },
+        },
+    },
 ]
 
 # ============================================================
@@ -665,9 +812,35 @@ TOOLS = [
 SYSTEM_PROMPT = """You are NetOps-Agent, an expert AI agent for IP network O&M troubleshooting.
 You solve problems by collecting device data via CLI commands and analyzing it.
 
-## Tool
-`execute_cli_command(device_name, command)` - Execute CLI on Huawei/Cisco/H3C devices.
-You can call multiple tools in parallel (different devices in one turn).
+## Tools
+1. `execute_cli_command(device_name, command)` - Execute CLI on Huawei/Cisco/H3C devices.
+   You can call multiple tools in parallel (different devices in one turn).
+2. `resolve_ip_to_device(ip)` - Deterministically map an IP to the device that owns it.
+   **Use this BEFORE guessing a device name from an IP.**
+   Example: resolve_ip_to_device(ip="10.1.5.1") -> ["Demeter-Prime-01", "Demeter-Prime-02"] (VRRP pair)
+
+## Few-shot examples (path questions)
+
+### EXAMPLE A — Same /24, L2 via aggregation switch
+Q: Hermes-Prime-01 addressing 10.1.1.20 (PJ area)
+- Hermes-Prime-01 Vlanif10 = 10.1.1.10/24, ARP of 10.1.1.20 via GE1/0/4 (uplink)
+- resolve_ip_to_device("10.1.1.20") -> Hermes-Prime-02
+- LLDP: Hermes-Prime-01 GE1/0/4 <-> Demeter-Prime-01 GE1/0/5
+Answer: Hermes-Prime-01->Demeter-Prime-01->Hermes-Prime-02
+Insight: **Same /24 does NOT mean direct L2**; traffic traverses the aggregation switch (Demeter-Prime).
+
+### EXAMPLE B — Cross-zone via symmetric Prime/Node overlay
+Q: Hermes-Prime-01 addressing 20.1.1.10 (PJ area, different zone)
+- No 20.1.x prefix in Hermes-Prime-01 routing-table; default route via 10.1.5.1 Vlanif50
+- resolve_ip_to_device("10.1.5.1") -> [Demeter-Prime-01, Demeter-Prime-02] (VRRP pair)
+- resolve_ip_to_device("20.1.1.10") -> Hermes-Node-01
+- Symmetric topology: Prime-zone gateway (Demeter-Prime) <-> Node-zone gateway (Demeter-Node)
+Answer: Hermes-Prime-01->Demeter-Prime-01->Demeter-Node-01->Hermes-Node-01
+
+### ANTI-EXAMPLE — Never invent device names
+Hallucinations to AVOID: Hermes-Spine-01, Hermes-Leaf-01, Hermes-Secondary-01, Node-10-1-1-X, Core-01, Gamma-Edge-XX.
+**ONLY use names from the VALID DEVICES whitelist provided in the hint.**
+If unsure, call `resolve_ip_to_device` — never fabricate a device name from an IP.
 
 ## Command Priority (most useful first)
 1. `display current-configuration` - BEST: contains interface descriptions with remote node+port info
@@ -948,6 +1121,7 @@ def run_agent(question_id: int, question_text: str) -> dict:
     tool_calls_count = 0
     empty_count = 0
     api_error_count = 0
+    validation_retried = False
     start_time = time.time()
     # 중복 쿼리 추적
     queried_commands: set[str] = set()
@@ -1017,6 +1191,26 @@ def run_agent(question_id: int, question_text: str) -> dict:
                 except json.JSONDecodeError:
                     args = {}
 
+                # [AUTO] P1: resolve_ip_to_device tool handling
+                if tc.name == "resolve_ip_to_device":
+                    ip_arg = args.get("ip", "").strip()
+                    owners = find_ip_owner(question_id, ip_arg) if ip_arg else []
+                    if owners:
+                        result_str = json.dumps({"ip": ip_arg, "owners": owners})
+                    else:
+                        prefix = ".".join(ip_arg.split(".")[:3]) + "." if ip_arg else ""
+                        graph = build_topology_snapshot(question_id)
+                        subnet = {k: v for k, v in graph["ip_owner"].items() if k.startswith(prefix)}
+                        result_str = json.dumps({
+                            "ip": ip_arg,
+                            "owners": [],
+                            "note": "Exact IP not found. Same /24 candidates:",
+                            "subnet_candidates": dict(list(subnet.items())[:10]),
+                        })
+                    log.info(f"  [Q{question_id}] Tool #{tool_calls_count}: resolve_ip_to_device({ip_arg}) -> {owners or 'subnet-fallback'}")
+                    messages.append({"role": "tool", "tool_call_id": tc.id, "content": result_str})
+                    continue
+
                 device = args.get("device_name", "")
                 command = args.get("command", "")
                 cmd_key = f"{device}:{command}"
@@ -1061,6 +1255,26 @@ def run_agent(question_id: int, question_text: str) -> dict:
                 continue
 
             elapsed = time.time() - start_time
+            # [AUTO] P0 validation: detect hallucinated devices / XML / missing arrow
+            _whitelist = set(load_scenario_devices(question_id))
+            _ok, _clean, _reason = validate_path_answer(
+                postprocess_answer(content, qtype), _whitelist, qtype
+            )
+            if not _ok and qtype == QTYPE_PATH and not validation_retried:
+                log.warning(f"  [Q{question_id}] Answer invalid ({_reason}) — correction retry")
+                messages.append({"role": "assistant", "content": content})
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        f"Your answer is invalid: {_reason}. "
+                        f"Output ONLY a single plain-text line: hop1->hop2->...->hopN. "
+                        f"Use ONLY devices from the whitelist: {sorted(_whitelist)}. "
+                        f"No IP addresses, no XML, no tool_call, no code blocks, no explanation. "
+                        f"If uncertain, output your best partial path from the routing data you already read."
+                    ),
+                })
+                validation_retried = True
+                continue
             log.info(f"  [Q{question_id}] Answer received ({elapsed:.1f}s, {tool_calls_count} tool calls)")
             return {
                 "question_id": question_id,
@@ -1068,7 +1282,7 @@ def run_agent(question_id: int, question_text: str) -> dict:
                 "tool_calls": tool_calls_count,
                 "duration_s": round(elapsed, 1),
                 "iterations": iteration + 1,
-                "status": "solved",
+                "status": "solved" if _ok else "validation_failed",
                 "qtype": qtype,
             }
         else:
