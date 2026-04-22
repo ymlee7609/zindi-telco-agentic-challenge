@@ -199,15 +199,30 @@ per-tag:
 - 평균 latency 33.9s, iters 4.8, tool calls 8.7
 - `submission_pilot_v0.csv` 생성 → `agent/common/submission/submission_combined.csv` Track A 열 50/550
 
-### 5.6 개선 전략 (현재 실행 중)
+### 5.6 개선 전략 (v4 까지 실행 + v5 계획)
 
-| 버전 | 변경점 | 예상 효과 |
-|------|--------|-----------|
-| v1 | baseline (7-pattern system prompt + 5 static few-shot) | IoU 0.18 |
-| v2 | XML 감지 재질의 + multi-answer 강제 규칙 | (10건 test 에서는 noise) |
-| **v3** | **RAG 도입** — train 2000 에서 특징 벡터 (14-dim) 유사 top-3 검색 → dynamic few-shot 주입 | **진행 중 (train 10 검증 후 50 확장)** |
-| v4 (계획) | Self-consistency n=3 + majority vote | 비용 3x, 정확도 +5~10% 기대 |
-| v5 (계획) | fine-tuning (LoRA) on train 2000 | Phase 3 대비, 큰 정확도 향상 가능 |
+| 버전 | 변경점 | 실측 효과 (train 50) |
+|------|--------|---------------------|
+| v1 | baseline (7-pattern system prompt + 5 static few-shot) | IoU 0.160, fb 22/50 |
+| v2 | XML 감지 재질의 + multi-answer 강제 규칙 | IoU 0.100 (regression) |
+| **v3** | **RAG 도입** — train 2000 에서 특징 벡터 (14-dim) 유사 top-3 검색 → dynamic few-shot 주입 | **IoU 0.220, fb 18/50** (+38%) |
+| v4 | v3 + Self-consistency n=3 + majority vote | train 10 IoU 0.425, fb **0/10** (비용 5x, 채택 X) |
+| v5 (계획) | fine-tuning (LoRA) on train 2000 | Phase 3 대비 |
+
+### 5.7 Stage C 최종 실행 (500/500 scenario 완료, 2026-04-23)
+
+| Batch | 범위 | 실행 | 완료 | P7 fallback | Avg latency |
+|-------|------|------|------|-------------|-------------|
+| Pilot v3 | test 0-49 | 2026-04-22 | 50/50 | 22 (44%) | 27.4s |
+| Batch A | test 50-249 | 2026-04-23 | 200/200 | **134 (67%)** | 38.4s |
+| Batch B | test 250-499 | 2026-04-23 | 250/250 | **187 (75%)** | 31.2s |
+| **합계** | **test 0-499** | — | **500/500** | **343 (68.6%)** | **32.3s** |
+
+**이슈**: train 50 v3 에서 36% 이던 P7 fallback 이 test 500 에서 **68.6% 로 급증**.
+가설: (1) train-test 분포 차이, (2) Batch A/B 병렬 실행으로 OpenRouter latency 증가, (3) Qwen reasoning 폭주.
+
+**제출물 생성**: `agent/track_a/submission/submission_v1.csv` (500 rows, RAG + P7 fallback)
+→ `agent/common/submission/submission_combined.csv` 의 Track A 500/550 자동 갱신.
 
 ---
 

@@ -95,38 +95,89 @@ Train eval 50 v3 에서 fallback 18/50 (36%) 이던 것이 test Batch A/B 에서
 
 ## 4. 다음 단계
 
-- [x] Smoke 10 실행 개시
-- [ ] Smoke 10 완료 → 결과 분석 (prediction 추출률, tool call 분포, latency 분포)
-- [ ] Smoke-train-eval 30 실행 → 로컬 accuracy 측정 (IoU mean)
-- [ ] Pilot 50 실행 (test.json)
-- [ ] Batch A 200 + Batch B 250 → 500 전수
-- [ ] Submission v1 생성 → Zindi 업로드
-- [ ] Opus overlay 대상 선정 (v1 에서 실패/오답 의심 scenario ≤50)
-- [ ] Submission v2 생성 (v1 + overlay)
+### 4.1 완료 (2026-04-22 ~ 04-23)
+
+- [x] Smoke 10 실행 / 분석 — prediction 7/10, empty 3 원인 XML 오염
+- [x] Train eval 10/50 (baseline v1) — IoU 0.160
+- [x] Train eval 10/50 (v2 XML+multi) — IoU 0.100 (regression)
+- [x] **RAG 구현** (`agent/track_a/rag.py`) + v3 train eval 50 — **IoU 0.220 +38%**
+- [x] **Self-consistency v4** — train 10 에서 fallback 0, 비용 5x 로 채택 X
+- [x] Pilot v3 50 (test 0-49)
+- [x] Batch A (test 50-249, 200 scenarios)
+- [x] Batch B (test 250-499, 250 scenarios)
+- [x] **Submission v1 생성** (500/500) — `agent/track_a/submission/submission_v1.csv`
+- [x] **통합 submission** (Track A 500 + Track B 50) — `agent/common/submission/submission_combined.csv`
+- [x] docs 전 영역 반영 (00_index, 03-1/03-2/03-3, 04_rag_architecture, 08_progress)
+
+### 4.2 진행 예정 (Zindi 점수 확인 후)
+
+- [ ] Zindi 사이트 `submission_combined.csv` 업로드 → Public leaderboard 점수 확인
+- [ ] Challenge rule 재확인: Opus overlay 금지, Qwen 단독만 제출 가능
+- [ ] Batch 개선 실험 (택 1 또는 복수):
+  - **(A) Batch 직렬 재실행**: 병렬 latency 제거로 fallback 감소 검증 (비용 0)
+  - **(B) Feature 확장**: traffic_data / signaling_plane_data 를 14-dim → 20-dim+ 로 확장 (RAG 품질 향상)
+  - **(C) Self-consistency 선택 적용**: v1 에서 P7 fallback 된 343 scenario 만 n=3 재실행 (비용 1.5x)
+  - **(D) LoRA fine-tuning**: train 2000 으로 Qwen3.5-35B-A3B 파인튜닝 (Phase 3 대비, 가장 큰 개선)
 
 ---
 
-## 5. 파일 구조 (Track A 관련)
+## 5. 파일 구조 (Track A 관련, 최종)
 
 ```
-agent/track_a/
-├── agent.py                            # Qwen runner
-├── prompts.py                          # system prompt + few-shot
-├── generate_submission.py              # result.csv → Zindi CSV
-├── eval_local.py                       # train 기반 로컬 accuracy
-├── tools/
-│   └── scenario_summary.py             # Stage A helper (scenario inline data 요약)
-├── results_smoke_1/                    # 1 scenario smoke-of-smoke (검증)
-├── results_smoke/                      # Smoke 10 (실행 중)
-├── results_pilot/                      # Pilot 50 (대기)
-├── results_batch_a/                    # Batch A 200 (대기)
-├── results_batch_b/                    # Batch B 250 (대기)
-└── submission/                         # Zindi CSV 저장소
+agent/
+├── common/
+│   ├── submission_example.csv           # Zindi 공식 550-row 템플릿
+│   └── submission/
+│       ├── merge_submission.py          # Track A/B 통합 merge 헬퍼
+│       ├── submission_combined.csv      # 최종 제출 CSV (Track A 500 + Track B 50)
+│       └── README.md
+└── track_a/
+    ├── agent.py                         # Qwen runner (RAG + XML re-ask + P7 fallback + self-consistency)
+    ├── prompts.py                       # system prompt + 5 static few-shot + forced prompt
+    ├── rag.py                           # 14-dim feature + train 2000 precompute + L2 retrieval
+    ├── generate_submission.py           # result.csv → Zindi CSV (combined 자동 갱신)
+    ├── eval_local.py                    # train 기반 IoU 측정
+    ├── tools/
+    │   └── scenario_summary.py          # Stage A scenario inline data 추출 헬퍼
+    ├── results_smoke/                   # Smoke 10 (test 0-9)
+    ├── results_smoke_1/                 # Smoke-of-smoke (1 scenario 검증)
+    ├── results_train_eval/              # Train eval 10 (v1 baseline)
+    ├── results_train_eval_v2/           # Train eval 10 (v2 XML+multi)
+    ├── results_train_eval_v3/           # Train eval 10 (v3 RAG)
+    ├── results_train_eval_v4/           # Train eval 10 (v4 RAG+n=3)
+    ├── results_train_eval_50/           # Train eval 50 (v1)
+    ├── results_train_eval_50_v2/        # Train eval 50 (v2)
+    ├── results_train_eval_50_v3/        # Train eval 50 (v3 RAG) ← 채택된 버전
+    ├── results_pilot/                   # Pilot 50 (v1, 구)
+    ├── results_pilot_v3/                # Pilot 50 (v3 RAG, test 0-49) ← submission 기반
+    ├── results_batch_a/                 # Batch A 200 (v3 RAG, test 50-249)
+    ├── results_batch_b/                 # Batch B 250 (v3 RAG, test 250-499)
+    └── submission/
+        └── submission_v1.csv            # Track A 최종 제출본 (v3 RAG)
 
 docs/track_a/
-└── 08_track_a_progress.md              # 본 문서
+├── 03-1_architecture.md                 # Agent 아키텍처 (Mermaid, Obsidian 호환)
+├── 03-2_topology.md                     # 무선 5G 토폴로지 (gNodeB/PCI/RSRP/SINR/A3 공식)
+├── 03-3_problems.md                     # 2000 train 통계 + 7-pattern + Stage C 결과
+├── 04_rag_architecture.md               # RAG 14-dim feature + retrieval + few-shot
+└── 08_track_a_progress.md               # 본 문서 (진행 리포트)
 
-.moai/plans/
-├── track-a-opus-typed-glacier.md       # 전체 플랜
-└── track-a-opus-solutions.md           # Stage A 수작업 풀이 + P1~P7 패턴 라이브러리
+.moai/
+├── cache/
+│   └── track_a_train_features.json      # RAG precompute (2000 entries, 14-dim + normalized)
+└── plans/
+    ├── track-a-opus-typed-glacier.md    # 전체 플랜
+    └── track-a-opus-solutions.md        # Stage A 수작업 풀이 + P1~P7 패턴 라이브러리
 ```
+
+## 6. 주요 수치 요약
+
+| 항목 | 값 |
+|------|-----|
+| Train eval 50 (v3 RAG) IoU | **0.220** (v1 baseline 0.160 대비 +38%) |
+| Train eval 50 (v3 RAG) exact | 11/50 (22%) |
+| Train eval 50 (v3 RAG) P7 fallback | 18/50 (36%) |
+| Test 500 scenarios 실행 | 500/500 완료 |
+| Test 500 P7 fallback | 343/500 (68.6%) — train 검증 대비 악화 |
+| Submission v1 평균 latency | 32.3s/scenario |
+| RAG cache 크기 | 1.1 MB (2000 entries × 14-dim + stats) |

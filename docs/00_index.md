@@ -102,15 +102,20 @@ IP 네트워크 토폴로지 / 경로 / 장애 트랙. Phase 1 50문제, Exact M
 - [x] **HIGH-ALIAS prompt RULE 1~4 명문화** (Q31/Q32 회귀 원인 해소 패치, TODO-15)
 - [ ] Phase 2 대비 에이전트 최적화
 
-### Track A (Wireless 5G Optimization) — **진행 중**
+### Track A (Wireless 5G Optimization) — **Phase 1 submission v1 제출 단계 (2026-04-23)**
 
 - [x] Challenge README 및 main.py/server.py 구조 파악
-- [x] train 2000 + test 500 scenario 스키마 확인 (inline data, answer 포함)
-- [x] **Stage A — Opus 수작업 풀이 (train 10 + traces 2)** → 9/10 정답, P1~P7 패턴 라이브러리 도출
-- [x] **Stage B — `agent/track_a/` 디렉토리 구축** (agent.py, prompts.py)
-- [ ] Stage B — generate_submission.py, eval_local.py
-- [ ] Stage C — Smoke 10 / Pilot 50 / Batch 250 × 2
-- [ ] Submission v1 (Qwen 단독) + v2 (Opus overlay)
+- [x] train 2000 + test 500 scenario 스키마 확인 (inline data; test answer 는 `"To be determined"` placeholder)
+- [x] **Stage A — Opus 수작업 풀이 (train 10 + traces 2)** → 9/10 정답, P1~P7 패턴 라이브러리 도출 (`.moai/plans/track-a-opus-solutions.md`)
+- [x] **Stage B — `agent/track_a/` 디렉토리 구축** (`agent.py`, `prompts.py`, `rag.py`, `generate_submission.py`, `eval_local.py`, `tools/scenario_summary.py`)
+- [x] **RAG 도입**: train 2000 precompute 14-dim feature cache → L2 retrieval top-3 → dynamic few-shot (`docs/track_a/04_rag_architecture.md`)
+- [x] **Self-consistency (v4)**: `--num-attempts N` + majority vote 구현 (train 10 에서 fb 0 달성, 비용 5x 로 v3 채택)
+- [x] **Stage C — Qwen 500/500 실행 완료** (Pilot v3 50 + Batch A 200 + Batch B 250)
+  - 로컬 검증 (train 50 v3 RAG): **IoU 0.220** (v1 baseline 0.160 대비 +38%)
+  - 이슈: test Batch 에서 P7 fallback 68.6% 로 train 검증 36% 대비 급증
+- [x] **Submission v1 생성**: `agent/track_a/submission/submission_v1.csv` → `agent/common/submission/submission_combined.csv` (550/550)
+- [ ] **Zindi 업로드 → Public leaderboard 점수 확인**
+- [ ] 점수 기반 다음: (A) Batch 직렬 재실행 / (B) Feature 확장 / (C) v4 부분 적용 / (D) Phase 3 LoRA fine-tuning
 
 ---
 
@@ -122,6 +127,16 @@ IP 네트워크 토폴로지 / 경로 / 장애 트랙. Phase 1 50문제, Exact M
 | Model | `qwen/qwen3.5-35b-a3b` |
 | MAX_TOKENS | 8192 (Qwen3 reasoning 대응) |
 | MAX_ITERATIONS | 30 (Track B) / 20 (Track A) |
-| Track A 출력 | `agent/track_a/results_*` |
+| Track A 서버 | `localhost:7861` (test) + `localhost:7862` (train, DATA_SPLIT=train) |
+| Track A 출력 | `agent/track_a/results_*` (pilot_v3, batch_a, batch_b, train_eval_50_v3) |
+| Track B 서버 | `localhost:7860` |
 | Track B 출력 | `agent/track_b/results_v6_full/`, `results_v9_test/`, `results_v10_test/` |
 | Track B 최종 제출본 | `agent/track_b/submission/submission_v6_full_v10.csv` (Zindi 업로드 대기) |
+| Track A 최종 제출본 | `agent/track_a/submission/submission_v1.csv` (RAG v3, 500 scenarios) |
+| 통합 submission | `agent/common/submission/submission_combined.csv` (550 rows, Zindi 제출 대상) |
+
+## Zindi 제출 절차
+
+1. `agent/common/submission/submission_combined.csv` 확인 (550 rows, Track A 500 + Track B 50)
+2. Zindi 사이트 업로드 → Public leaderboard 점수 확인
+3. 점수 기반 Track A 개선 방향 결정 (Track B 는 v10 로 48/50 solved 로 baseline)
