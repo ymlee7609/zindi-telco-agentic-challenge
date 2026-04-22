@@ -32,6 +32,15 @@ def load_id_to_scenario() -> dict[int, str]:
     return {item["task"]["id"]: item["scenario_id"] for item in data}
 
 
+def flatten_newlines(text: str) -> str:
+    """Convert actual newline chars to literal '\\n' (2 chars) so each CSV cell
+    stays on a single physical line. Required because Zindi's parser does not
+    support quoted fields containing newlines (error: 'Unclosed quoted field')."""
+    if text is None:
+        return ""
+    return text.replace("\r\n", "\\n").replace("\r", "\\n").replace("\n", "\\n")
+
+
 def load_predictions(path: Path) -> dict[int, str]:
     preds: dict[int, str] = {}
     with open(path, encoding="utf-8-sig") as f:
@@ -40,7 +49,7 @@ def load_predictions(path: Path) -> dict[int, str]:
                 qid = int(row["id"])
             except (KeyError, ValueError):
                 continue
-            preds[qid] = row.get("prediction", "")
+            preds[qid] = flatten_newlines(row.get("prediction", ""))
     return preds
 
 

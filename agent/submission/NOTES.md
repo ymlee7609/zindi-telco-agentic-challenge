@@ -24,7 +24,8 @@
 | `submission_v6_full_v4.csv` | 2026-04-22 | v3 베이스 + **PJ Path Q34~Q37 Opus 에뮬레이션 일괄 재작성** (3-column, 제출 불가) |
 | `submission_v6_full_v5.csv` | 2026-04-22 | **`id, prediction` 2-column 규격 준수** — Zindi 제출용. v6_full + Q11 retry + Q34~Q38 Opus v4 병합 |
 | `submission_v6_full_v6.csv` | 2026-04-22 | v5 베이스 + **Q36/Q37 retry3 P0/P1/P2 개선 결과** (super-spine physical path) 로 덮어쓰기 |
-| `submission_v6_full_v7.csv` | 2026-04-22 | **공식 example 포맷 준수** (`ID, Track A, Track B` 3-column, 550 rows) — Zindi 제출 최종본 |
+| `submission_v6_full_v7.csv` | 2026-04-22 | 공식 example 포맷 준수 (`ID, Track A, Track B` 3-column, 550 rows) — **quote 내부 LF 로 `Unclosed quoted field` 에러** |
+| `submission_v6_full_v8.csv` | 2026-04-22 | **v7 의 multi-line prediction 을 literal `\\n` 으로 평탄화** — 각 row single line 보장, Zindi 업로드 통과 |
 
 ## v3 에서 변경된 항목
 
@@ -79,8 +80,16 @@ Hermes-Prime-01->Demeter-Prime-01->Atlas-Prime-01->Janus-Prime-01->Aegis-Node-01
 
 ## 권장 제출
 
-- **제출**: **`submission_v6_full_v7.csv`** (유일한 올바른 포맷)
-- v1~v6 는 포맷 미스매치로 제출 불가 (로컬 기록용)
+- **제출**: **`submission_v6_full_v8.csv`** (single-line 평탄화, Zindi 파서 호환)
+- v7: example 과 동일 schema 지만 **multi-line quote 처리 문제로 업로드 에러**
+- v1~v6: 포맷 미스매치로 제출 불가 (로컬 기록용)
+
+## Zindi 파서 제약 (2026-04-22 확인)
+
+- 에러 메시지: `submission.csv parsing for error metric [Track a iou] failed: Unclosed quoted field in line 1`
+- 원인: Topology 답의 multi-link 를 `"link1\nlink2\nlink3"` (quote + 실제 LF) 로 저장하면 Zindi 파서가 quote 내부 newline 을 지원하지 않아 첫 quote 가 닫히지 않은 것으로 판정
+- 해결: **모든 cell 을 single line 으로 강제** — 실제 `\r\n`, `\r`, `\n` 을 literal `\n` (backslash + n, 2 chars) 로 치환
+- evaluator 가 literal `\n` 을 LF 로 복원해 "each line represents one link" 판정할 것으로 가정
 
 ## Submission 생성 Helper
 

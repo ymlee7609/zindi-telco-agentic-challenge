@@ -19,8 +19,9 @@
   - `agent/submission/submission_v6_full_v4.csv` (v4, v3 + **PJ Path Q34~Q37 Opus 일괄 재작성**, 2026-04-22, 3-column 로컬용)
   - `agent/submission/submission_v6_full_v5.csv` (**v5, Zindi 규격 `id, prediction` 2-column**, 2026-04-22, 제출용)
   - `agent/submission/submission_v6_full_v6.csv` (v6, Q36/Q37 retry3 physical path 반영, 2026-04-22, 로컬용)
-  - `agent/submission/submission_v6_full_v7.csv` (**v7, 공식 example `ID, Track A, Track B` 3-column 포맷 준수**, 2026-04-22, **최종 제출본**)
-  - `agent/submission/generate_submission.py` — 앞으로 submission 은 이 스크립트로 재생성 (공식 example schema 강제)
+  - `agent/submission/submission_v6_full_v7.csv` (v7, 공식 schema 준수이지만 quote 내부 LF 로 Zindi 파싱 실패, 2026-04-22, 로컬 보존)
+  - `agent/submission/submission_v6_full_v8.csv` (**v8, multi-line 답을 literal `\n` 으로 평탄화** — 최종 제출본, 2026-04-22)
+  - `agent/submission/generate_submission.py` — 앞으로 submission 은 이 스크립트로 재생성 (공식 example schema + newline 평탄화 강제)
 - **완료 문서**: 문제 상세본 `docs/03-3-1_problems_detail.md` 신규 추가
 
 ---
