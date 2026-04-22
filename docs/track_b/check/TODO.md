@@ -87,8 +87,12 @@ PJ Spine 위치 장비에 대해 세 출처가 서로 다른 답을 가리킴:
 | TODO-02 | 시뮬레이션 데이터 vs 토폴로지 정의 모순 해소 | High | **완료** | `TODO-02_topology_audit.md` |
 | TODO-03 | agent.py Topology hint 에 device whitelist 주입 (P0 코드 수정) | High | **완료** (commit 9ed4721) | — |
 | TODO-04 | Q30~Q33 v8 정답 sample 검증 (PJ Topology alias 영향 범위) | Medium | **완료** | `TODO-04_q30_q33_audit.md` |
-| TODO-05 | Topology hint 에 "답 라인 수 = UP 포트 수" 가드 + post-validation | Medium | 미착수 | — |
-| TODO-06 | TODO-03 패치 후 PJ Topology Q29~Q33 재실행 (v9 제출본 생성) | Medium | 미착수 | — |
+| TODO-05 | Topology hint 에 "답 라인 수 = UP 포트 수" 가드 + post-validation | Medium | **완료** (commit 5c748b1) | — |
+| TODO-06 | TODO-03 패치 후 PJ Topology Q29~Q33 재실행 (v9 제출본 생성) | Medium | **완료** | `TODO-06_v9_rerun_audit.md` |
+| TODO-07 | Q29 v9 재실패 원인 분석 (forced_answer 트리거) | Medium | 미착수 | — |
+| TODO-08 | Eon-Node-01 / PJlAN-01 alias 매핑 확인 (Q32 GE1/0/3) | Low | 미착수 | — |
+| TODO-09 | description 잘림 케이스 별도 처리 (Q32 GE1/0/2 = "to") | Low | 미착수 | — |
+| TODO-10 | v9 제출본 Zindi 제출 | Medium | submission_v6_full_v9.csv 생성 완료, Zindi 업로드는 사용자 결정 | — |
 
 ## 핵심 발견 요약 (2026-04-22)
 

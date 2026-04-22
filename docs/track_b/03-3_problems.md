@@ -124,9 +124,9 @@ Delta-Axis-01(GE1/0/6)->Delta-Portal-02(GE1/0/1)
 
 **정답 (v8 제출본)**:
 ```
-Demeter-Prime-01(GE1/0/0)->Spine2(GE1/0/2)
-Demeter-Prime-01(GE1/0/1)->Spine1(GE1/0/2)
-Demeter-Prime-01(GE1/0/5)->PC1(GE1/0/4)
+Demeter-Prime-01(GE1/0/0)->Atlas-Prime-01(GE1/0/2)
+Demeter-Prime-01(GE1/0/1)->Atlas-Prime-02(GE1/0/2)
+Demeter-Prime-01(GE1/0/5)->Hermes-Prime-01(GE1/0/4)
 ```
 
 ### Q30
@@ -151,12 +151,12 @@ Atlas-Prime-01(GE1/0/3)->Demeter-Prime-02(GE1/0/0)
 
 **정답 (v8 제출본)**:
 ```
-Janus-Prime-01(GE1/0/0)->Alpha-Center-01(GE1/0/0)
-Janus-Prime-01(GE1/0/1)->Beta-Axis-02(GE1/0/1)
-Janus-Prime-01(GE1/0/2)->Core-01(GE1/0/1)
-Janus-Prime-01(GE1/0/3)->Core-02(GE1/0/2)
-Janus-Prime-01(GE1/0/4)->Core-02(GE1/0/3)
-Janus-Prime-01(GE1/0/5)->Edge-01(GE1/0/1)
+Janus-Prime-01(GE1/0/0)->Atlas-Prime-01(GE1/0/0)
+Janus-Prime-01(GE1/0/1)->Atlas-Prime-02(GE1/0/0)
+Janus-Prime-01(GE1/0/2)->PX1(GE1/0/0)
+Janus-Prime-01(GE1/0/3)->Aegis-Prime-02(GE1/0/2)
+Janus-Prime-01(GE1/0/4)->Janus-Prime-02(GE1/0/4)
+Janus-Prime-01(GE1/0/5)->Aegis-Prime-01(GE1/0/2)
 ```
 
 ### Q32
@@ -167,9 +167,9 @@ Janus-Prime-01(GE1/0/5)->Edge-01(GE1/0/1)
 
 **정답 (v8 제출본)**:
 ```
-Aegis-Prime-01(ETH1/0/3)->Aegis-Prime-02(ETH1/0/1)
-Aegis-Prime-01(ETH1/0/0)->Aegis-Prime-02(ETH1/0/0)
-Aegis-Prime-01(ETH1/0/1)->Aegis-Prime-02(ETH1/0/1)
+Aegis-Prime-01(GE1/0/3)->Eon-Node-01(GE1/0/1)
+Aegis-Prime-01(GE1/0/0)->Janus-Prime-02(GE1/0/5)
+Aegis-Prime-01(GE1/0/1)->Aegis-Prime-02(GE1/0/1)
 ```
 
 ### Q33
@@ -180,7 +180,10 @@ Aegis-Prime-01(ETH1/0/1)->Aegis-Prime-02(ETH1/0/1)
 
 **정답 (v8 제출본)**:
 ```
+Janus-Node-02(GE1/0/2)->Atlas-Node-01(GE1/0/2)
+Janus-Node-02(GE1/0/3)->Atlas-Node-02(GE1/0/2)
 Janus-Node-02(GE1/0/4)->Aegis-Node-01(GE1/0/1)
+Janus-Node-02(GE1/0/5)->Janus-Node-01(GE1/0/5)
 ```
 
 ---

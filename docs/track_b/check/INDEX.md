@@ -37,20 +37,25 @@
 | `TODO-01_qwen_alias_audit.md` | Qwen alias 사용 원인 (description 자체가 alias + Topology hint whitelist 누락) |
 | `TODO-02_topology_audit.md` | 도면 vs ARP vs description 비교 → 도면 truth 확인, alias 매핑 표 |
 | `TODO-04_q30_q33_audit.md` | Q30~Q33 sample 검증 — 4가지 실패 패턴 분류 + TODO-03 효과 예상 |
+| `TODO-06_v9_rerun_audit.md` | v9 재실행 결과 — Q31 alias 6/6 해소, Q33 incomplete 해소, Q29 fail |
 
 ## 결과 표
 
-| Q | 유형 | 시나리오 | 결론 | 비고 |
-|---|---|---|---|---|
-| Q29 | Topology | PJ | **불일치** | description="Spine2/Spine1/PC1" alias → 도면 truth = Atlas-Prime-01/02/Hermes-Prime-01 (TODO-02 확정) |
-| Q30 | Topology | PJ | **일치** | description 이 모두 정확명 (To-Janus-Prime-01-...), v8 4/4 정답 |
-| Q31 | Topology | PJ | **불일치** | v8 6/6 모두 잘못 — Alpha-Center/Beta-Axis/Core/Edge 등 다른 zone·alias hallucination |
-| Q32 | Topology | PJ | **불일치** | v8 3개 라인 중 1/3 정답(Aegis-Prime-02), 1/3 잘못, ETH1/0/2 누락 |
-| Q33 | Topology | PJGFA | **불일치 (incomplete)** | description 4개 UP 정확명, v8 가 1 라인만 답함 (early stop) |
+| Q | 유형 | 시나리오 | v8 결론 | v9 결론 | 비고 |
+|---|---|---|---|---|---|
+| Q29 | Topology | PJ | 불일치 (alias) | v9 fail → cli.py 수동 결과 채택 | 도면 + ARP MAC 양방향 검증으로 truth 확정 |
+| Q30 | Topology | PJ | **일치** | **일치 (4/4 도면)** | description 정확명 |
+| Q31 | Topology | PJ | 불일치 (6/6 alias) | **일치 (6/6 도면) ⭐** | TODO-03 패치로 alias·hallucination 모두 해소 |
+| Q32 | Topology | PJ | 불일치 (1/3) | 부분 일치 (2/3) | Eon-Node-01 alias 미확인, GE1/0/2 누락 |
+| Q33 | Topology | PJGFA | 불일치 (1/4 incomplete) | **일치 (4/4) ⭐** | TODO-05 LINE COUNT GUARD 효과 |
 
 ## 진행 현황
 
 - v8 매핑 정정: **완료** (50/50 v8 일치 — 단, v8 정답 자체의 정확성은 별개)
-- PJ Topology cli.py 검증: 5 / 5 (Q29~Q33) — **4/5 불일치 또는 incomplete, Q30 만 정답**
-- TODO-03 P0 패치 적용 완료 (Topology hint 에 whitelist + ALIAS WARNING)
-- 후속 과제: TODO-05(라인 수 가드) 신규 + Q29~Q33 재실행 권장
+- PJ Topology cli.py 검증: 5 / 5 (Q29~Q33) — sample 검증 완료
+- TODO-03 (Topology hint whitelist + ALIAS WARNING): **완료**
+- TODO-05 (LINE COUNT GUARD + validate_topology_answer): **완료**
+- TODO-06 (v9 재실행): **완료** — Q31 alias 6/6 해소, Q33 incomplete 4/4 해소, Q29 fail (cli.py 수동 결과로 대체)
+- v9 제출본 생성: `agent/track_b/submission/submission_v6_full_v9.csv` (Q29~Q33 만 갱신, 나머지 v8)
+- 03-3_problems.md 갱신: Q29(수동), Q31, Q32, Q33 = v9 답으로 교체
+- 후속: TODO-07 (Q29 fail 원인), TODO-08 (Eon-Node-01 alias), TODO-09 (description 잘림), TODO-10 (Zindi 제출)
