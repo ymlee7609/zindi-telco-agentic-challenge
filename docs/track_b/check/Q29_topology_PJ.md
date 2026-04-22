@@ -138,12 +138,51 @@ Demeter-Prime-01(GE1/0/5)->PC1(GE1/0/4)
 
 확인 필요: 03-2_topology_pj 도면의 Spine1/Spine2 가 Atlas-Prime-01/02 와 동일 위치인지 비교
 
-## 6. 결론
+## 6. 사용자 확인 (2026-04-22 추가) — v8 의 Spine1/Spine2 는 잘못된 alias
 
-- 정정 후 03-3 정답(v8) 은 **도형 alias 차이(Spine1/Spine2 ↔ Atlas-Prime-*) 외에는 cli.py 검증 결과와 일치 가능성 높음**
-- 매핑 정정 자체는 완료(`v8_mapping_audit.md`)
-- L3 (PC1) 는 양쪽 답 모두 동일 — 의심 해소
+**PJ Area Network 의 Spine 위치 장비 = `Janus-Prime` 계열** (사용자 확인).
+따라서 v8 의 `Spine1/Spine2` 라벨은 채점 기준 표기와 어긋난 잘못된 alias 사용 — **v8 Q29 정답은 틀림**.
+
+### 데이터 vs 토폴로지 정의 충돌 (미해결)
+
+cli.py 로 추가 검증 결과 (2026-04-22):
+
+```bash
+# Janus-Prime-01, Janus-Prime-02 의 ARP 에 Demeter-Prime-01 의 MAC(3877-7111-0100)
+# 또는 192.168.2.x peer 가 있는지
+for dev in Janus-Prime-01 Janus-Prime-02; do
+  python agent/track_b/cli.py --question 29 --device "$dev" --exec "display arp" \
+      | grep -E "192\.168\.2\.|3877-7111-010[01]"
+done
+# → 둘 다 매칭 없음
+```
+
+```bash
+# Demeter-Prime-01 의 peer MAC(3877-7111-0100) 이 어느 장비에 등록돼 있는지
+# → Atlas-Prime-01 의 ARP 에서만 Dynamic 엔트리로 발견됨
+# → Atlas-Prime-02 도 Demeter-Prime-01 의 GE1/0/1 peer 로 등장
+```
+
+| 출처 | Demeter-Prime-01 GE1/0/0 peer | GE1/0/1 peer |
+|---|---|---|
+| 사용자 정의 (PJ Spine = Janus-Prime) | Janus-Prime 계열 | Janus-Prime 계열 |
+| v8 모델 출력 | `Spine2` (잘못된 alias) | `Spine1` (잘못된 alias) |
+| cli.py ARP 추적 (시뮬레이션 raw 데이터) | `Atlas-Prime-01(GE1/0/2)` | `Atlas-Prime-02(GE1/0/2)` |
+
+**모순**: 사용자 정의로는 Janus-Prime 이지만, 시뮬레이션 ARP 데이터는 Atlas-Prime 을 가리킴. 세 가능성:
+1. 03-2_topology_pj 도면의 Atlas-Prime-* 위치가 사실은 Janus-Prime 으로 라벨링되어야 하는데 도면 작성에 오류
+2. PJ Area 안에 여러 Spine 계층이 있고 Demeter-Prime-01 의 직속 peer 는 다른 그룹의 Spine
+3. 시뮬레이션 데이터(ARP cache 파일) 자체가 정답 채점 기준과 다르게 생성됨 (challenge 의도된 trap)
+
+도면 `docs/track_b/03-2_topology_pj.svg` + Demeter-Prime-01 의 `display current-configuration` interface description 추가 검증 필요.
+
+## 7. 결론 (갱신)
+
+- **v8 정답 Q29 는 틀림** (Spine1/Spine2 alias 사용 — 채점 정답은 Janus-Prime 계열 표기)
+- cli.py 검증 결과(Atlas-Prime-01/02) 도 사용자 정의(Janus-Prime)와 불일치 — **시뮬레이션 데이터 vs 토폴로지 정의 모순** 미해결
+- L3 (PC1) 만 양쪽 일치 — 부분 의심 해소
 
 권장 액션:
-1. PJ 영역 alias 표(`Spine1=Atlas-Prime-01?`, `Spine2=Atlas-Prime-02?`) 를 03-2_topology_pj 도면 또는 server.py 로부터 확정. 확정 후 v8 정답을 그대로 신뢰 가능
-2. 다른 PJ Topology 문제(Q30~Q33) 도 같은 alias 패턴인지 sample 검증 권장
+1. **즉시**: 03-2_topology_pj 도면에서 Demeter-Prime-01 의 직접 peer 가 Janus-Prime 인지 Atlas-Prime 인지 확정
+2. v8 정답 자체가 잘못된 사실을 반영해 03-3_problems.md 의 Q29 (및 동일 패턴인 Q30~Q33) 재검토
+3. Qwen 모델이 alias 를 사용한 원인 분석 — 별도 TODO 항목으로 등록 (`TODO.md` 참조)

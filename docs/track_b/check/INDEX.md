@@ -32,19 +32,17 @@
 | 파일 | 내용 |
 |---|---|
 | `v8_mapping_audit.md` | 50문제 매핑 진단 + 정정 절차 + 매핑 표 |
-| `Q29_topology_PJ.md` | PJ Topology Q29 cli.py 풀이 + v8 정답 비교 + alias 가설 |
+| `Q29_topology_PJ.md` | PJ Topology Q29 cli.py 풀이 + v8 정답 비교 + 사용자 확인(Spine=Janus-Prime) |
+| `TODO.md` | 후속 조사 과제 (Qwen alias 사용 원인, 데이터 vs 토폴로지 모순) |
 
 ## 결과 표
 
 | Q | 유형 | 시나리오 | 결론 | 비고 |
 |---|---|---|---|---|
-| Q29 | Topology | PJ | **부분일치 (alias 미확정)** | v8 정답 = `Spine2/Spine1/PC1`, 도출 = `Atlas-Prime-01/02/PC1` — Spine1/2 ↔ Atlas-Prime-* alias 가설. PC1 라인 일치 |
+| Q29 | Topology | PJ | **불일치 (v8 alias 오류 + 데이터 모순)** | v8 = `Spine1/Spine2`(alias 오류), cli.py = `Atlas-Prime-*`(시뮬레이션 ARP), 사용자 정답 = `Janus-Prime` 계열. 데이터/도면 모순 미해결 — `TODO.md` |
 
 ## 진행 현황
 
-- v8 매핑 정정: **완료** (50/50 v8 일치)
-- 개별 문제 cli.py 검증: 1 / 22 (Q29만 시범)
-- 다음 단계 사용자 결정 대기:
-  - (a) PJ 영역 alias 표 확정 + 나머지 PJ 22문제 검증 진행
-  - (b) 정정만 완료하고 cli.py 풀이 검증은 별도 세션
-  - (c) 매핑 정정 결과 commit + 다음 작업 별도 결정
+- v8 매핑 정정: **완료** (50/50 v8 일치 — 단, v8 정답 자체의 정확성은 별개)
+- 개별 문제 cli.py 검증: 1 / 22 (Q29 시범, **v8 정답 오류 + 데이터 모순 발견**)
+- 후속 과제: `TODO.md` 2건 (TODO-01 Qwen alias 원인, TODO-02 데이터 vs 토폴로지 모순)
