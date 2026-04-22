@@ -14,7 +14,10 @@
 | TODO-04 | Q30~Q33 v8 정답 sample 검증 | Medium | **완료** | `f1a4318` | `TODO-04_q30_q33_audit.md` |
 | TODO-05 | Topology 답 라인수 가드 + `validate_topology_answer` | Medium | **완료** | `5c748b1` | `agent/track_b/agent.py:412, 463-499, 1373-1418` |
 | TODO-06 | TODO-03/05 패치 후 Q29~Q33 재실행 + v9 제출본 | Medium | **완료** | `a6bcec5` | `TODO-06_v9_rerun_audit.md`, `submission_v6_full_v9.csv` |
-| TODO-07 | Q29 v9 재실패 원인 분석 (forced_answer 트리거) | Medium | 미착수 | — | — |
+| TODO-07 | Q29 v9 재실패 원인 분석 (forced_answer 트리거) | Medium | **완료** | `TODO-07_q29_failure_audit.md` |
+| TODO-11 | forced_answer 분기 validation 추가 (패치 5-A, P0) | High | 미착수 | — |
+| TODO-12 | forced 응답 XML/tool_call 감지 fallback (패치 5-B, P1) | Medium | 미착수 | — |
+| TODO-13 | alias 다발 노드 escalation (패치 5-C, P2) | Low | 미착수 | — | — |
 | TODO-08 | Eon-Node-01 / PJlAN-01 alias 매핑 확인 (Q32 GE1/0/3) | Low | 미착수 | — | — |
 | TODO-09 | description 잘림 케이스 별도 처리 (Q32 GE1/0/2 = "to") | Low | 미착수 | — | — |
 | TODO-10 | v9 제출본 Zindi 업로드 | Medium | 대기 (사용자 결정) | — | `submission_v6_full_v9.csv` 준비 완료 |
@@ -149,19 +152,49 @@ v8 → v9 결과 비교:
 
 ---
 
+### TODO-07 — Q29 v9 재실패 원인 분석 ✅
+
+**진행 일자**: 2026-04-22
+
+결과 요약:
+- **원인 확정**: `agent/track_b/agent.py:1473-1485` 의 `forced_answer` 분기에서 `resp2.content` 를 포맷/whitelist 검증 없이 즉시 return. 모델이 강제 응답에도 `<tool_call>...XML...</tool_call>` 텍스트를 송출했고 그게 답으로 등록됨.
+- **기여 요인**: Q29 가 description 거의 전부 alias (Spine2/Spine1/PC1) 로 가장 복잡한 cross-check 필요 케이스. TODO-03/05 의 긴 hint 텍스트가 모델 추론 부담을 늘려 빈 응답 → forced 분기 트리거.
+- **단기 우회**: Q29 답은 cli.py 수동 검증 결과(`Atlas-Prime-01/02, Hermes-Prime-01`) 로 이미 갱신됨.
+
+신규 TODO 3건 파생:
+- TODO-11 (P0): forced_answer 분기 validation 추가
+- TODO-12 (P1): forced 응답 XML 감지 fallback
+- TODO-13 (P2): alias 다발 노드 escalation
+
+상세: `TODO-07_q29_failure_audit.md`
+
+---
+
 ## 2. 미착수 TODO 상세
 
-### TODO-07 — Q29 v9 재실패 원인 분석 (Medium)
+### TODO-11 — forced_answer 분기 validation 추가 (P0)
 
-**현상**: Q29 가 4 iter, 30.2s 만에 forced_answer 로 종료되며 답이 XML tool_call 형식 그대로.
+**근거**: TODO-07 §4 결함 A (forced_answer 분기에 응답 검증 부재).
 
-**조사 항목**:
-- [ ] agent.py 의 forced_answer 트리거 로직 확인 (어느 조건에서 발동하는지)
-- [ ] validation_retried 플래그가 forced_answer 분기와 어떻게 상호작용하는지
-- [ ] Q29 의 모델 trace 가 results_v9_test/run.log 에 없는 이유 (agent.py 가 run.log 를 어떤 케이스에서 생성 안 하는지)
-- [ ] 4 iter 만에 답을 못 도출한 이유 (toolset 탐색 부족? prompt 문제?)
+**패치 5-A**: `agent/track_b/agent.py:1480` 의 forced 분기에 `validate_topology_answer` / `validate_path_answer` 호출 추가. invalid 면 한 번 더 강제 정정 요청 (empty_count 리셋 + continue).
 
-**가설**: forced_answer 분기가 validation retry 보다 먼저 트리거되어 "유효하지 않은 답이라도 답을 강제 출력" 한 것. 또는 첫 iter 의 답이 XML 이라 postprocess 가 처리 못함.
+상세: `TODO-07_q29_failure_audit.md` §5
+
+### TODO-12 — forced 응답 XML/tool_call 감지 fallback (P1)
+
+**근거**: Q29 가 강제 응답에도 XML 을 송출한 패턴은 모델 행동 이슈.
+
+**패치 5-B**: `postprocess_answer` 또는 신규 함수에서 `<tool_call>|<function=|<parameter=` 패턴 감지 시 마지막 정상 assistant message 로 fallback.
+
+상세: `TODO-07_q29_failure_audit.md` §5
+
+### TODO-13 — alias 다발 노드 escalation (P2)
+
+**근거**: Q29 의 description 이 거의 모두 alias (Spine2/Spine1/PC1) — 모델에게 추가 cross-check 가 필요한 케이스임을 명시 필요.
+
+**패치 5-C**: description 의 alias 비율이 높으면 prompt 에 "이 노드는 description 대부분이 alias 임. 직접 cross-check 필수" 명시.
+
+상세: `TODO-07_q29_failure_audit.md` §5
 
 ---
 

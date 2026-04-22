@@ -39,6 +39,7 @@
 | `TODO-02_topology_audit.md` | 보고서 | 도면 vs ARP vs description, 도면 truth 확정 + alias 매핑 표 |
 | `TODO-04_q30_q33_audit.md` | 보고서 | Q30~Q33 sample 검증 + 4가지 실패 패턴 분류 |
 | `TODO-06_v9_rerun_audit.md` | 보고서 | v9 재실행 결과 + v8↔v9 라인별 비교 + 패치 효과 검증 |
+| `TODO-07_q29_failure_audit.md` | 보고서 | Q29 v9 fail 원인 — forced_answer 분기 validation 부재, 신규 TODO-11/12/13 파생 |
 
 코드 변경 (별도 보고서 없음, TODO.md §1 의 진행 결과 + commit 메시지 참조):
 
