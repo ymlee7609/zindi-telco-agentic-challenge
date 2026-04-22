@@ -34,15 +34,37 @@
 - `agent/track_a/eval_local.py` — IoU 기반 로컬 정확도 측정기
 - `agent/track_a/tools/scenario_summary.py` — scenario inline data 추출 헬퍼 (Stage A 에서 사용)
 
-### Stage C — Qwen 본 실행 (진행 중)
+### Stage C — Qwen 본 실행 (Batch 완료 + 이슈 발견)
 
-| 단계 | 문제 수 | 결과 디렉토리 | 상태 |
-|------|---------|--------------|------|
-| Smoke | 10 | `agent/track_a/results_smoke/` | **실행 중** (test.json) |
-| Smoke-train-eval | 30 | `agent/track_a/results_smoke_train/` | 대기 (train.json 로컬 검증) |
-| Pilot | 50 | `agent/track_a/results_pilot/` | 대기 |
-| Batch A | 200 | `agent/track_a/results_batch_a/` | 대기 |
-| Batch B | 250 | `agent/track_a/results_batch_b/` | 대기 |
+| 단계 | 문제 수 | 결과 디렉토리 | 완료 | P7 fallback | Avg latency |
+|------|---------|--------------|------|-------------|-------------|
+| Smoke | 10 | `results_smoke/` | 2026-04-22 | 3/10 (30%) | 35.6s |
+| Train eval 10 (v1) | 10 | `results_train_eval/` | 2026-04-22 | 6/10 (60%) | 28.2s |
+| Train eval 50 (v1) | 50 | `results_train_eval_50/` | 2026-04-22 | 22/50 (44%) | 46.1s |
+| Train eval 50 (v2) | 50 | `results_train_eval_50_v2/` | 2026-04-22 | 22/50 (44%) | 61.8s |
+| **Train eval 50 (v3 RAG)** | 50 | `results_train_eval_50_v3/` | 2026-04-22 | **18/50 (36%)** | **34.6s** |
+| Train eval 10 (v4 RAG+n=3) | 10 | `results_train_eval_v4/` | 2026-04-22 | **0/10** | 140s (5x cost) |
+| Pilot v3 (0-49) | 50 | `results_pilot_v3/` | 2026-04-22 | 22/50 (44%) | 27.4s |
+| **Batch A (50-249)** | 200 | `results_batch_a/` | 2026-04-23 | **134/200 (67%)** | 38.4s |
+| **Batch B (250-499)** | 250 | `results_batch_b/` | 2026-04-23 | **187/250 (75%)** | 31.2s |
+
+### Stage C 이슈 — Batch Fallback 급증
+
+Train eval 50 v3 에서 fallback 18/50 (36%) 이던 것이 test Batch A/B 에서
+**67% / 75% 로 급증**. 원인 가설:
+
+1. **Train-Test 분포 차이**: train 2000 의 RAG precompute 로 유사도 매칭 → test scenario 는 train 에 직접 매칭이 안 되어 retrieval 품질 저하
+2. **병렬 실행 시 OpenRouter latency 증가** — max iteration 도달 전에 Qwen reasoning 이 끝나지 않아 XML 오염 패턴 재발
+3. **Long-tail test scenarios** — 특수 패턴 (P6 excessive tilt) 비율이 test 에 더 높을 가능성
+
+**영향**: Submission v1 은 500/500 채워졌으나 실제 정확도는 train 검증 (IoU 0.22) 보다
+낮을 가능성. 로컬 검증 불가 (test answer placeholder).
+
+**대응 (Phase 1 남은 기간)**:
+- Batch 단독 직렬 재실행 (OpenRouter rate 여유) → fallback 감소 검증
+- v4 self-consistency 를 실패 의심 scenario 에만 적용
+- Feature 확장 (traffic/signaling 추가)
+- Phase 3 대비 Qwen fine-tuning (LoRA on train 2000)
 
 통과 기준:
 - Smoke: tool 체인 정상 작동 (empty response ≤3, 평균 latency <90s)

@@ -1,6 +1,6 @@
 # Zindi Telco Agentic Challenge — 문서 인덱스
 
-> 최종 업데이트: 2026-04-22
+> 최종 업데이트: 2026-04-23
 > 문서 구조: **공통 / Track A / Track B** 3영역 분리
 
 ---
@@ -39,6 +39,7 @@ single / multiple answer.
 | 03-1 | [track_a/03-1_architecture.md](track_a/03-1_architecture.md) | Track A 에이전트 아키텍처 (Mermaid + provider/tool/prompt 흐름) | 완료 |
 | 03-2 | [track_a/03-2_topology.md](track_a/03-2_topology.md) | 무선 5G 네트워크 토폴로지 (gNodeB/PCI/RSRP/SINR/A3 handover) | 완료 |
 | 03-3 | [track_a/03-3_problems.md](track_a/03-3_problems.md) | Phase 1 문제 분석 + 7-pattern library (P1~P7) | 완료 |
+| 04 | [track_a/04_rag_architecture.md](track_a/04_rag_architecture.md) | RAG 동작 구조 (14-dim feature + retrieval + dynamic few-shot) | 신규 |
 | 08 | [track_a/08_track_a_progress.md](track_a/08_track_a_progress.md) | Track A 진행 리포트 | 최신 |
 
 관련 자원 (repo 내):
@@ -60,8 +61,10 @@ IP 네트워크 토폴로지 / 경로 / 장애 트랙. Phase 1 50문제, Exact M
 | 03-3 | [track_b/03-3_problems.md](track_b/03-3_problems.md) | 50문제 유형별 분석 (Topology/Path/Fault) | 완료 |
 | 03-3-1 | [track_b/03-3-1_problems_detail.md](track_b/03-3-1_problems_detail.md) | 50문제 상황·과제·단서 상세 | 완료 |
 | 05 | [track_b/05_track_b_strategy.md](track_b/05_track_b_strategy.md) | Track B 전략 가이드 | 완료 |
-| 06 | [track_b/06_progress_report.md](track_b/06_progress_report.md) | Track B 진행 경과 리포트 | 최신 (2026-04-22) |
+| 06 | [track_b/06_progress_report.md](track_b/06_progress_report.md) | Track B 진행 경과 리포트 (v1~v10) | 최신 (2026-04-23) |
 | 07 | [track_b/07_not_solved_recovery_strategy.md](track_b/07_not_solved_recovery_strategy.md) | Non-solved 3문제 해결 전략 (Q11, Q36, Q38 ultrathink + Opus overlay) | 완료 (2026-04-22) |
+| check | [track_b/check/INDEX.md](track_b/check/INDEX.md) | v8 매핑 정정 + TODO-01~15 검증 산출물 색인 | 최신 (2026-04-22) |
+| check | [track_b/check/TODO.md](track_b/check/TODO.md) | TODO-01~15 진행 현황 / 완료 상세 | 최신 (2026-04-22) |
 
 ---
 
@@ -89,6 +92,14 @@ IP 네트워크 토폴로지 / 경로 / 장애 트랙. Phase 1 50문제, Exact M
 - [x] **Non-solved 3문제 보강**: Q11 SOLVED, Q36 타당한 forced, Q38 Opus overlay
 - [x] **Qwen P0/P1/P2 개선안 구현** (topology snapshot, resolve_ip_to_device tool, few-shot, answer validation)
 - [x] **submission_v6_full_v8.csv** (Qwen + Opus overlay) — Zindi 제출 완료
+- [x] **v8 매핑 감사 / 50문제 → 03-3 재매핑** (commit `3487a3d`)
+- [x] **PJ Topology Q29~Q33 sample 검증** + alias 원인 분석 (TODO-01~04)
+- [x] **Topology hint 에 whitelist + ALIAS WARNING + LINE COUNT GUARD 주입** (TODO-03/05)
+- [x] **submission_v6_full_v9.csv** (Q29 수동 + Q31/Q32/Q33 재실행 정답) — Zindi 제출 후보
+- [x] **forced_answer 분기 validation + XML fallback + HIGH-ALIAS prompt** (TODO-11/12/13)
+- [x] **count_up_physical_ports (10G) suffix 버그 수정** + PJlAN-01/BorderLeaf2 alias 확증 (TODO-08/09)
+- [x] **submission_v6_full_v10.csv** (Q29 자동 정답 도출) — 최종 제출 후보 (v9 와 byte-identical)
+- [x] **HIGH-ALIAS prompt RULE 1~4 명문화** (Q31/Q32 회귀 원인 해소 패치, TODO-15)
 - [ ] Phase 2 대비 에이전트 최적화
 
 ### Track A (Wireless 5G Optimization) — **진행 중**
@@ -112,4 +123,5 @@ IP 네트워크 토폴로지 / 경로 / 장애 트랙. Phase 1 50문제, Exact M
 | MAX_TOKENS | 8192 (Qwen3 reasoning 대응) |
 | MAX_ITERATIONS | 30 (Track B) / 20 (Track A) |
 | Track A 출력 | `agent/track_a/results_*` |
-| Track B 출력 | `agent/track_b/results_v6_full/` |
+| Track B 출력 | `agent/track_b/results_v6_full/`, `results_v9_test/`, `results_v10_test/` |
+| Track B 최종 제출본 | `agent/track_b/submission/submission_v6_full_v10.csv` (Zindi 업로드 대기) |
