@@ -29,15 +29,24 @@
 
 ## 산출물
 
-| 파일 | 내용 |
-|---|---|
-| `v8_mapping_audit.md` | 50문제 매핑 진단 + 정정 절차 + 매핑 표 |
-| `Q29_topology_PJ.md` | PJ Topology Q29 cli.py 풀이 + v8 정답 비교 + 사용자 확인(Spine=Janus-Prime) |
-| `TODO.md` | 후속 조사 과제 색인 (TODO-01~04) |
-| `TODO-01_qwen_alias_audit.md` | Qwen alias 사용 원인 (description 자체가 alias + Topology hint whitelist 누락) |
-| `TODO-02_topology_audit.md` | 도면 vs ARP vs description 비교 → 도면 truth 확인, alias 매핑 표 |
-| `TODO-04_q30_q33_audit.md` | Q30~Q33 sample 검증 — 4가지 실패 패턴 분류 + TODO-03 효과 예상 |
-| `TODO-06_v9_rerun_audit.md` | v9 재실행 결과 — Q31 alias 6/6 해소, Q33 incomplete 해소, Q29 fail |
+| 파일 | 종류 | 내용 |
+|---|---|---|
+| `INDEX.md` | 색인 | 이 파일 — 작업 흐름·결과 표·산출물 한눈에 |
+| `TODO.md` | 색인 | TODO-01~10 진행 현황 + 완료 상세 + 미착수 조사 항목 |
+| `v8_mapping_audit.md` | 보고서 | 50문제 매핑 진단 + 정정 절차 + 매핑 표 (commit `3487a3d`) |
+| `Q29_topology_PJ.md` | 풀이 로그 | PJ Topology Q29 cli.py 시범 검증 + v8 비교 + 도면 truth |
+| `TODO-01_qwen_alias_audit.md` | 보고서 | Qwen alias 원인 (description 자체 + Topology hint whitelist 누락) |
+| `TODO-02_topology_audit.md` | 보고서 | 도면 vs ARP vs description, 도면 truth 확정 + alias 매핑 표 |
+| `TODO-04_q30_q33_audit.md` | 보고서 | Q30~Q33 sample 검증 + 4가지 실패 패턴 분류 |
+| `TODO-06_v9_rerun_audit.md` | 보고서 | v9 재실행 결과 + v8↔v9 라인별 비교 + 패치 효과 검증 |
+
+코드 변경 (별도 보고서 없음, TODO.md §1 의 진행 결과 + commit 메시지 참조):
+
+| commit | 변경 위치 | 요약 |
+|---|---|---|
+| `9ed4721` | `agent/track_b/agent.py:288, 412-465` | TODO-03 Topology hint whitelist + ALIAS WARNING + `_DEVICES_ROOT` 경로 버그 수정 |
+| `5c748b1` | `agent/track_b/agent.py:438-499, 1373-1418` | TODO-05 `count_up_physical_ports` + `validate_topology_answer` + LINE COUNT GUARD + Topology retry |
+| `a6bcec5` | `submission_v6_full_v9.csv` (신규), `03-3_problems.md` | TODO-06 v9 제출본 생성 + Q29(수동),Q31,Q32,Q33 답 갱신 |
 
 ## 결과 표
 
