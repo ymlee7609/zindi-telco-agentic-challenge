@@ -112,7 +112,7 @@ SDK_TYPE = _provider_cfg.get("sdk", "openai")
 
 NOC_API_URL = "http://127.0.0.1:7860/api/agent/execute"
 MAX_ITERATIONS = 30
-MAX_TOKENS = 4096
+MAX_TOKENS = 8192
 TIMEOUT_SECONDS = 540  # 9분 - 안전 마진
 
 logging.basicConfig(
@@ -285,7 +285,24 @@ def extract_fault_info(question_text: str) -> dict:
     return info
 
 
-def build_type_hint(qtype: str, question_text: str) -> str:
+_DEVICES_ROOT = Path(__file__).resolve().parent.parent / "data" / "Track B" / "devices_outputs"
+
+
+def load_scenario_devices(question_id: int) -> list[str]:
+    """devices_outputs/{qid}/ 에서 실제 장비 목록 수집 (scenario별 화이트리스트)"""
+    qdir = _DEVICES_ROOT / str(question_id)
+    if not qdir.is_dir():
+        return []
+    try:
+        return sorted(
+            d.name for d in qdir.iterdir()
+            if d.is_dir() and not d.name.startswith(".")
+        )
+    except OSError:
+        return []
+
+
+def build_type_hint(qtype: str, question_text: str, question_id: int = 0) -> str:
     """질문 유형별 cold-start 힌트 생성 (user message로 주입)"""
     if qtype == QTYPE_TOPOLOGY:
         info = extract_topology_info(question_text)
@@ -336,6 +353,45 @@ def build_type_hint(qtype: str, question_text: str) -> str:
             f"\n  Example: description From_NodeA_GE1/0/2_To_NodeB_GE1/0/6 -> next hop is NodeB"
             f"\nStep 4: Repeat Steps 1-3 on the next device until route is 'Direct'."
             f"\nOutput ONLY one line: NodeA->NodeB->...->NodeZ"
+        )
+        # [AUTO] Anti-hallucination: real device whitelist + IP/loop guards
+        devices = load_scenario_devices(question_id)
+        if devices:
+            device_list = ", ".join(devices)
+            hint += (
+                f"\n\nVALID DEVICES in this scenario (ONLY these names exist):"
+                f"\n  {device_list}"
+                f"\nABSOLUTELY DO NOT invent names like 'Hermes-Secondary-XX', 'Core-01', 'Node-10-1-1-X', 'Gamma-Edge-XX'."
+                f"\nIf a device is not in the list above, IT DOES NOT EXIST. Skip it."
+            )
+        hint += (
+            f"\n\nIP HANDLING: A destination IP such as '10.1.1.10' is NEVER a device name."
+            f"\n  Do NOT query 'Node-10-1-1-10'. Always resolve IP via routing-table next-hop,"
+            f"\n  then map next-hop IP to a real device from the whitelist via interface description or ARP."
+            f"\nLOOP GUARD: If you see [DUPLICATE-SKIPPED] in tool results, you are looping."
+            f"\n  STOP exploring. Produce the BEST answer from data gathered so far, even if incomplete."
+        )
+        # [AUTO] Default route + VRRP + empty-EVPN fallbacks (Q38 lessons)
+        hint += (
+            f"\n\nDEFAULT ROUTE FALLBACK:"
+            f"\n  If destination IP has no matching prefix in routing-table, use 0.0.0.0/0 next-hop."
+            f"\n  Then find the device that OWNS this next-hop IP by:"
+            f"\n    1. Query `display ip interface brief` on candidate devices from the whitelist"
+            f"\n    2. The device where next-hop IP appears as a local interface IP (or VRRP shared IP"
+            f"\n       on a Vbdif/Vlanif interface) is the next hop"
+            f"\n    3. Confirm via `display lldp neighbor brief` adjacency to the current source"
+            f"\nVRRP / SHARED GATEWAY PATTERN:"
+            f"\n  If a next-hop IP appears as a /24 gateway on multiple devices (e.g., 10.1.5.1 on both"
+            f"\n  Demeter-Prime-01 and Demeter-Prime-02 Vbdif50), this is a VRRP redundancy pair."
+            f"\n  Pick the device that has LLDP adjacency with the current source node."
+            f"\nEMPTY EVPN/BGP TABLE NOTE:"
+            f"\n  Non-VTEP leaf devices (e.g., access leaves like Hermes-Prime/Hermes-Node) often have"
+            f"\n  EMPTY `display bgp evpn all routing-table` and `display bgp vpnv4 all routing-table`."
+            f"\n  Do NOT stall on empty tables. Fall back to routing-table + LLDP + interface brief."
+            f"\nVXLAN OVERLAY HOPS:"
+            f"\n  A VPN-instance routing-table entry like `0.0.0.0/0 IBGP via <VTEP-IP> VXLAN` means"
+            f"\n  the next logical hop is the remote VTEP device. Resolve VTEP-IP to a device via"
+            f"\n  its LoopBack0 IP (search `display ip interface brief` across the whitelist)."
         )
         return hint
 
@@ -877,7 +933,7 @@ def run_agent(question_id: int, question_text: str) -> dict:
 
     # 질문 유형 감지 및 cold-start 힌트 생성
     qtype = detect_question_type(question_text)
-    type_hint = build_type_hint(qtype, question_text)
+    type_hint = build_type_hint(qtype, question_text, question_id)
     log.info(f"  [Q{question_id}] Type: {qtype}")
 
     messages: list[dict[str, Any]] = [
@@ -903,9 +959,11 @@ def run_agent(question_id: int, question_text: str) -> dict:
             messages.append({
                 "role": "user",
                 "content": (
-                    "TIME IS ALMOST UP. Based on ALL data collected so far, "
-                    "provide your FINAL ANSWER NOW. Output ONLY the answer "
-                    "in the exact format required. No explanation."
+                    "STOP. Time is up. Do NOT emit any tool_call, function tag, or XML. "
+                    "Output ONLY a single plain-text line: the final answer in the exact "
+                    "format required (e.g., 'NodeA->NodeB->NodeC' for path questions). "
+                    "No explanation, no tags, no JSON. If data is incomplete, output your "
+                    "best partial path from the routes already observed."
                 ),
             })
             try:
@@ -1033,8 +1091,9 @@ def run_agent(question_id: int, question_text: str) -> dict:
                     messages.append({
                         "role": "user",
                         "content": (
-                            "You have collected sufficient data. Provide your FINAL ANSWER NOW. "
-                            "Output ONLY the answer in the exact format required. No explanation."
+                            "You have collected sufficient data. Output ONLY a single plain-text "
+                            "line: the final answer in the exact format required. Do NOT emit "
+                            "any tool_call, function tag, XML, or JSON. No explanation."
                         ),
                     })
                 try:

@@ -8,12 +8,15 @@
 | Path (경로 추적) | Q7-Q16, Q34-Q38 | 15 |
 | Fault (장애 진단) | Q17-Q28, Q39-Q50 | 24 |
 
-### 진행 상태
+### 진행 상태 (v6_full 실행 중, 2026-04-21)
 
-| 상태 | 개수 |
-|------|------|
-| SOLVED | 9 |
-| TODO | 41 |
+| 상태 | 개수 | 비고 |
+|------|------|------|
+| SOLVED | 20 | Topology 6/6 + Path 9/10 + Fault 5 초기 |
+| FORCED_ANSWER | 1 | Q11 (Path, Spine routing 제약 시나리오) |
+| IN PROGRESS | 29 | Q20 이후 연속 실행 중 |
+
+> 상세: `06_progress_report.md` §4 참조. 문제별 상황/과제 설명: `03-3-1_problems_detail.md`.
 
 ---
 

@@ -1,0 +1,23 @@
+﻿id,prediction
+11,Beta-Node-03->Beta-Axis-02->Beta-Portal-02->Alpha-Center-02
+36,Hermes-Node-01->Demeter-Node-01->Atlas-Node-01->Hermes-Prime-01
+38,"<tool_call>
+<function=execute_cli_command>
+<parameter=device_name>
+Hermes-Prime-02
+</parameter>
+<parameter=command>
+display ip routing-table
+</parameter>
+</function>
+</tool_call>
+<tool_call>
+<function=execute_cli_command>
+<parameter=device_name>
+Hermes-Prime-02
+</parameter>
+<parameter=command>
+display current-configuration
+</parameter>
+</function>
+</tool_call>"

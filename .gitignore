@@ -183,6 +183,13 @@ secret-*.*
 .moai/worktrees/
 
 # ===========================================
+# Evolution Telemetry (local-only usage data)
+# Learnings and new-skills are git-tracked for team sharing.
+# ===========================================
+.moai/evolution/telemetry/*.jsonl
+!.moai/evolution/telemetry/.gitkeep
+
+# ===========================================
 # Node.js (for docs/Nextra)
 # ===========================================
 node_modules/
@@ -205,14 +212,10 @@ dist-ssr/
 .netlify/
 .firebase/
 
-# ===========================================
-# Competition Data (too large for git)
-# ===========================================
+# User Custom Patterns (preserved by moai update)
 data/Track B/devices_outputs/
 data/Track B/devices_outputs.zip
 data/.cache/
 data/.huggingface/
-
-# Agent results (local only)
 agent/results/
 agent/results_v2/

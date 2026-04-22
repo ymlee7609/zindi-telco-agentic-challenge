@@ -1,0 +1,21 @@
+﻿id,prediction
+38,"<tool_call>
+<function=execute_cli_command>
+<parameter=device_name>
+Demeter-Prime-01
+</parameter>
+<parameter=command>
+display ip routing-table
+</parameter>
+</function>
+</tool_call>
+<tool_call>
+<function=execute_cli_command>
+<parameter=device_name>
+Demeter-Prime-01
+</parameter>
+<parameter=command>
+display current-configuration
+</parameter>
+</function>
+</tool_call>"
