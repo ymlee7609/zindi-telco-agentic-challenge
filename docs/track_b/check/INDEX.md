@@ -36,15 +36,21 @@
 | `TODO.md` | 후속 조사 과제 색인 (TODO-01~04) |
 | `TODO-01_qwen_alias_audit.md` | Qwen alias 사용 원인 (description 자체가 alias + Topology hint whitelist 누락) |
 | `TODO-02_topology_audit.md` | 도면 vs ARP vs description 비교 → 도면 truth 확인, alias 매핑 표 |
+| `TODO-04_q30_q33_audit.md` | Q30~Q33 sample 검증 — 4가지 실패 패턴 분류 + TODO-03 효과 예상 |
 
 ## 결과 표
 
 | Q | 유형 | 시나리오 | 결론 | 비고 |
 |---|---|---|---|---|
-| Q29 | Topology | PJ | **불일치 (v8 alias 오류 + 데이터 모순)** | v8 = `Spine1/Spine2`(alias 오류), cli.py = `Atlas-Prime-*`(시뮬레이션 ARP), 사용자 정답 = `Janus-Prime` 계열. 데이터/도면 모순 미해결 — `TODO.md` |
+| Q29 | Topology | PJ | **불일치** | description="Spine2/Spine1/PC1" alias → 도면 truth = Atlas-Prime-01/02/Hermes-Prime-01 (TODO-02 확정) |
+| Q30 | Topology | PJ | **일치** | description 이 모두 정확명 (To-Janus-Prime-01-...), v8 4/4 정답 |
+| Q31 | Topology | PJ | **불일치** | v8 6/6 모두 잘못 — Alpha-Center/Beta-Axis/Core/Edge 등 다른 zone·alias hallucination |
+| Q32 | Topology | PJ | **불일치** | v8 3개 라인 중 1/3 정답(Aegis-Prime-02), 1/3 잘못, ETH1/0/2 누락 |
+| Q33 | Topology | PJGFA | **불일치 (incomplete)** | description 4개 UP 정확명, v8 가 1 라인만 답함 (early stop) |
 
 ## 진행 현황
 
 - v8 매핑 정정: **완료** (50/50 v8 일치 — 단, v8 정답 자체의 정확성은 별개)
-- 개별 문제 cli.py 검증: 1 / 22 (Q29 시범, **v8 정답 오류 + 데이터 모순 발견**)
-- 후속 과제: `TODO.md` 2건 (TODO-01 Qwen alias 원인, TODO-02 데이터 vs 토폴로지 모순)
+- PJ Topology cli.py 검증: 5 / 5 (Q29~Q33) — **4/5 불일치 또는 incomplete, Q30 만 정답**
+- TODO-03 P0 패치 적용 완료 (Topology hint 에 whitelist + ALIAS WARNING)
+- 후속 과제: TODO-05(라인 수 가드) 신규 + Q29~Q33 재실행 권장

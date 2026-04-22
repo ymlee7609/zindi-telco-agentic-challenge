@@ -85,8 +85,10 @@ PJ Spine 위치 장비에 대해 세 출처가 서로 다른 답을 가리킴:
 |---|---|---|---|---|
 | TODO-01 | Qwen 모델의 alias 사용 원인 분석 | High | **완료** | `TODO-01_qwen_alias_audit.md` |
 | TODO-02 | 시뮬레이션 데이터 vs 토폴로지 정의 모순 해소 | High | **완료** | `TODO-02_topology_audit.md` |
-| TODO-03 | agent.py Topology hint 에 device whitelist 주입 (P0 코드 수정) | High | 미착수 | — |
-| TODO-04 | Q30~Q33 v8 정답 sample 검증 (PJ Topology alias 영향 범위) | Medium | 미착수 | — |
+| TODO-03 | agent.py Topology hint 에 device whitelist 주입 (P0 코드 수정) | High | **완료** (commit 9ed4721) | — |
+| TODO-04 | Q30~Q33 v8 정답 sample 검증 (PJ Topology alias 영향 범위) | Medium | **완료** | `TODO-04_q30_q33_audit.md` |
+| TODO-05 | Topology hint 에 "답 라인 수 = UP 포트 수" 가드 + post-validation | Medium | 미착수 | — |
+| TODO-06 | TODO-03 패치 후 PJ Topology Q29~Q33 재실행 (v9 제출본 생성) | Medium | 미착수 | — |
 
 ## 핵심 발견 요약 (2026-04-22)
 
