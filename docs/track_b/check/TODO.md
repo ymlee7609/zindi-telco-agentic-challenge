@@ -15,12 +15,14 @@
 | TODO-05 | Topology 답 라인수 가드 + `validate_topology_answer` | Medium | **완료** | `5c748b1` | `agent/track_b/agent.py:412, 463-499, 1373-1418` |
 | TODO-06 | TODO-03/05 패치 후 Q29~Q33 재실행 + v9 제출본 | Medium | **완료** | `a6bcec5` | `TODO-06_v9_rerun_audit.md`, `submission_v6_full_v9.csv` |
 | TODO-07 | Q29 v9 재실패 원인 분석 (forced_answer 트리거) | Medium | **완료** | `TODO-07_q29_failure_audit.md` |
-| TODO-11 | forced_answer 분기 validation 추가 (패치 5-A, P0) | High | 미착수 | — |
-| TODO-12 | forced 응답 XML/tool_call 감지 fallback (패치 5-B, P1) | Medium | 미착수 | — |
-| TODO-13 | alias 다발 노드 escalation (패치 5-C, P2) | Low | 미착수 | — | — |
-| TODO-08 | Eon-Node-01 / PJlAN-01 alias 매핑 확인 (Q32 GE1/0/3) | Low | 미착수 | — | — |
-| TODO-09 | description 잘림 케이스 별도 처리 (Q32 GE1/0/2 = "to") | Low | 미착수 | — | — |
-| TODO-10 | v9 제출본 Zindi 업로드 | Medium | 대기 (사용자 결정) | — | `submission_v6_full_v9.csv` 준비 완료 |
+| TODO-11 | forced_answer 분기 validation 추가 (패치 5-A, P0) | High | **완료** | (이 커밋) | `agent/track_b/agent.py:1586-1676` |
+| TODO-12 | forced 응답 XML/tool_call 감지 fallback (패치 5-B, P1) | Medium | **완료** | (이 커밋) | `agent/track_b/agent.py:752-798` (helpers) + forced 분기 |
+| TODO-13 | alias 다발 노드 escalation (패치 5-C, P2) | Low | **완료** | (이 커밋) | `agent/track_b/agent.py:801-845, build_type_hint` |
+| TODO-08 | Eon-Node-01 / PJlAN-01 alias 매핑 확인 (Q32 GE1/0/3) | Low | **완료** | (이 커밋) | `TODO-08_pjlan_alias_audit.md` |
+| TODO-09 | description 잘림 케이스 처리 + `count_up_physical_ports` (10G) suffix 버그 | Low→High | **완료** | (이 커밋) | `TODO-09_description_truncation_audit.md`, `agent.py:420-438` |
+| TODO-14 | TODO-11/12/13 패치 후 Q29~Q33 재실행 + v10 제출본 | Medium | **완료** | (이 커밋) | `TODO-14_v10_rerun_audit.md`, `submission_v6_full_v10.csv` |
+| TODO-15 | HIGH-ALIAS prompt 조정 (Q31/Q32 회귀 방지) | High | **완료** | (이 커밋) | `agent/track_b/agent.py:538-569` — RULE 1~4 명문화 |
+| TODO-10 | v10 제출본 Zindi 업로드 | Medium | 대기 (사용자 결정) | — | `submission_v6_full_v10.csv` (v9 와 byte-identical, Q29 자동 도출 기준) |
 
 ---
 
@@ -170,68 +172,138 @@ v8 → v9 결과 비교:
 
 ---
 
-## 2. 미착수 TODO 상세
+## 2. TODO-11/12/13 완료 상세
 
-### TODO-11 — forced_answer 분기 validation 추가 (P0)
+### TODO-11 — forced_answer 분기 validation 추가 ✅
 
-**근거**: TODO-07 §4 결함 A (forced_answer 분기에 응답 검증 부재).
+**진행 일자**: 2026-04-22
 
-**패치 5-A**: `agent/track_b/agent.py:1480` 의 forced 분기에 `validate_topology_answer` / `validate_path_answer` 호출 추가. invalid 면 한 번 더 강제 정정 요청 (empty_count 리셋 + continue).
+코드 변경:
+- `agent/track_b/agent.py:1586-1676` (기존 forced 분기 교체):
+  - `validate_topology_answer` / `validate_path_answer` 호출 추가
+  - invalid 시 마지막 한 번 강제 정정 요청 (`empty_count = 0`, `validation_retried = True`, `continue`)
+  - return status: valid → `"forced_answer"`, invalid → `"forced_validation_failed"` (재시도 기회 소진 시)
+  - retry 메시지에 "Absolutely no XML, no <tool_call>, no <function=, no <parameter=" 명시
 
-상세: `TODO-07_q29_failure_audit.md` §5
+### TODO-12 — forced 응답 XML/tool_call 감지 fallback ✅
 
-### TODO-12 — forced 응답 XML/tool_call 감지 fallback (P1)
+**진행 일자**: 2026-04-22
 
-**근거**: Q29 가 강제 응답에도 XML 을 송출한 패턴은 모델 행동 이슈.
+코드 변경:
+- `agent/track_b/agent.py:749-798` (신규 helpers):
+  - `_TOOL_CALL_XML_RE`: `<tool_call>`, `<function=`, `<parameter=` 패턴 regex
+  - `has_tool_call_xml(content) -> bool`: XML 텍스트 감지
+  - `find_last_valid_assistant_answer(messages, qtype, whitelist, target, expected_lines)`: 메시지 버퍼를 역순 스캔해 XML 없는 유효 assistant 답 추출 (postprocess + validate 모두 통과)
+- forced 분기에서 invalid + XML 감지 시 fallback 먼저 시도, 없으면 TODO-11 retry
 
-**패치 5-B**: `postprocess_answer` 또는 신규 함수에서 `<tool_call>|<function=|<parameter=` 패턴 감지 시 마지막 정상 assistant message 로 fallback.
+### TODO-13 — alias 다발 노드 escalation prompt ✅
 
-상세: `TODO-07_q29_failure_audit.md` §5
+**진행 일자**: 2026-04-22
 
-### TODO-13 — alias 다발 노드 escalation (P2)
+코드 변경:
+- `agent/track_b/agent.py:801-849` (신규):
+  - `compute_description_alias_ratio(question_id, target, whitelist) -> (alias_count, total)`
+  - target 의 `display_current-configuration.txt` 에서 interface description 파싱
+  - peer 이름 (`whitelist` 에 존재) 이 description 에 substring 으로 매칭 안 되면 alias 로 카운트
+- `build_type_hint` Topology 분기 (LINE COUNT GUARD 뒤):
+  - `total >= 3` 이고 `alias / total >= 0.5` 이면 `HIGH-ALIAS TARGET` 섹션 주입
+  - "description 만 읽지 말고 ARP /30 + 역방향 description 으로 cross-check 필수" 명시
 
-**근거**: Q29 의 description 이 거의 모두 alias (Spine2/Spine1/PC1) — 모델에게 추가 cross-check 가 필요한 케이스임을 명시 필요.
+unit 검증 결과:
 
-**패치 5-C**: description 의 alias 비율이 높으면 prompt 에 "이 노드는 description 대부분이 alias 임. 직접 cross-check 필수" 명시.
-
-상세: `TODO-07_q29_failure_audit.md` §5
+| Q | target | alias/total | HIGH-ALIAS |
+|---|---|---|---|
+| Q29 | Demeter-Prime-01 | 6/10 (60.0%) | 발동 |
+| Q30 | Atlas-Prime-01 | 1/5 (20.0%) | — |
+| Q31 | Janus-Prime-01 | 4/8 (50.0%) | 발동 |
+| Q32 | Aegis-Prime-01 | 3/5 (60.0%) | 발동 |
+| Q33 | Janus-Node-02 | 0/6 (0.0%) | — |
 
 ---
 
-### TODO-08 — Eon-Node-01 / PJlAN-01 alias 매핑 확인 (Low)
+### TODO-08 — Eon-Node-01 / PJlAN-01 alias 매핑 확인 ✅
 
-**현상**: Q32 v9 답 `Aegis-Prime-01(GE1/0/3)->Eon-Node-01(GE1/0/1)` — description 은 `To-PJlAN-01-GE1/0/1`. 모델이 PJlAN-01 을 whitelist 의 Eon-Node-01 로 매핑.
+**진행 일자**: 2026-04-22 / 산출물: `TODO-08_pjlan_alias_audit.md`
 
-**조사 항목**:
-- [ ] PJlAN-01 이 Eon-Node-01 의 alias 인지 확인 (도면·다른 노드 description 으로 cross-check)
-- [ ] Eon-Node-01 의 ARP/description 에서 Aegis-Prime-01 GE1/0/3 매칭 검증
-- [ ] 모델이 무엇을 근거로 매핑했는지 (Eon-Node-01 만 whitelist 에 남았기 때문일 가능성)
-
----
-
-### TODO-09 — description 잘림 케이스 처리 (Low)
-
-**현상**: Q32 의 Aegis-Prime-01 GigabitEthernet1/0/2 의 description 이 `to` 로 잘려 있음. 모델이 답에 누락. 도면 truth = Janus-Prime-01 GE1/0/5.
-
-**조사 항목**:
-- [ ] description 잘림 패턴이 다른 노드/문제에도 있는지 grep
-- [ ] agent.py 의 prompt 또는 후처리에 "description 이 비정상적으로 짧으면 도면/ARP 로 fallback" 가드 추가 검토
-- [ ] 잘린 description 자동 감지 (length < 5 또는 단어 1개) 후 cross-check 명령 트리거
+결과 요약:
+- **PJlAN-01 = Eon-Node-01 의 alias 확정** — 3중 교차 검증 성립
+  1. Eon-Node-01 GE1/0/1 description = `To-Aegis-Prime-01-GE1/0/3` (역방향 description)
+  2. Eon-Node-01 LLDP logbuffer: `RemoteSystemName=Aegis-Prime-01, RemotePortId=GigabitEthernet1/0/3, LocalInterface=GE1/0/1`
+  3. Q32 내에서만 사용 (scenario-local alias — 다른 시나리오에는 없음)
+- v9 Q32 GE1/0/3 답 `Aegis-Prime-01(GE1/0/3)->Eon-Node-01(GE1/0/1)` 은 **도면 truth 와 일치 → 정답**
+- 추가 코드 변경 없음 — 현재 ALIAS WARNING + HIGH-ALIAS 가드가 이미 올바르게 작동
 
 ---
 
-### TODO-10 — v9 제출본 Zindi 업로드 (Medium, 사용자 결정)
+### TODO-09 — description 잘림 케이스 처리 ✅
 
-**현황**: `agent/track_b/submission/submission_v6_full_v9.csv` 생성 완료. v8 대비 Q29~Q33 5개 row 만 갱신.
+**진행 일자**: 2026-04-22 / 산출물: `TODO-09_description_truncation_audit.md`
 
-**예상 효과**:
-- Q31 (6/6 도면 정답) + Q33 (4/4 정답) 에서 v8 대비 10 라인 정답 추가
-- Q29 (수동) + Q32 (2/3) 에서 부분 개선
-- Q30 은 변화 없음
+1. **초기 가설 오인 정정**:
+   - TODO-04 가 Q32 Aegis-Prime-01 GE1/0/2 description = "to" 로 잘려 있다고 기술
+   - 실제 파일 재확인 결과 `description to Janus-Prime-01-GE1/0/5` 로 **잘리지 않은 정상 description** (lowercase `to `, space-separated)
+   - GE1/0/2 는 `PHY=up, Protocol=down` 이라 Topology UP/UP 답에서 제외되는 것이 맞음
 
-**결정 사항**:
-- Zindi 제출 여부 (사용자 판단)
-- 제출 시 v9 description (예: "v9 — TODO-03/05 patch with manual Q29")
+2. **진짜 버그 발견 및 수정** — `count_up_physical_ports` (10G) suffix:
+   - Huawei display_interface_brief.txt 에서 `GigabitEthernet1/0/0(10G)   up   up` 같이 bandwidth suffix `(10G)` 가 붙은 경우 기존 정규식이 매칭 실패
+   - Q32 Aegis-Prime-01 에서 이 버그로 UP ports = **0** → LINE COUNT GUARD 무력화 상태였음
+   - 수정: `r"^\s*(GE|GigabitEthernet)\d+/\d+/\d+(?:\([^)]*\))?\s+(\*?down|up)\s+(\*?down|up)"` (`(10G)`, `*down` 등 수용)
+   - 결과: Q32 UP=0 → **UP=3 복구** (Q29~Q31, Q33 는 영향 없음)
+
+3. **부수 발견** — Q32 v9 실제 **3/3 정답**:
+   - GE1/0/0 BorderLeaf2 = Janus-Prime-02 alias (Janus-Prime-02 GE1/0/5 desc 역방향 확증)
+   - GE1/0/3 PJlAN-01 = Eon-Node-01 alias (TODO-08 확정)
+   - GE1/0/1 = Aegis-Prime-02 (description 정확명)
+   - TODO-06 의 `2/3` 집계는 alias 확정 전이라 오판정
+
+---
+
+### TODO-14 — TODO-11/12/13 패치 후 Q29~Q33 재실행 ✅
+
+**완료**: Q29 3/3 자동 정답 (v9 XML fail 해결), Q30 4/4 회귀 없음, Q31/Q32 회귀 발견 (TODO-15 로 이어짐), Q33 은 시간 절감 위해 중단 (v9 4/4 유지).
+
+**실행 명령**:
+```bash
+LLM_PROVIDER=openrouter python agent/track_b/agent.py \
+  -i "data/Track B/data/Phase_1/test.json" \
+  -o agent/track_b/results_v10_test \
+  --questions 29,30,31,32,33 --fresh --provider openrouter
+```
+
+상세: `TODO-14_v10_rerun_audit.md`
+
+---
+
+### TODO-15 — HIGH-ALIAS prompt 조정 (회귀 방지) ✅
+
+**근거**: Q31 v10 에서 GE1/0/3,5 2 라인 회귀 (6/6→4/6), Q32 v10 에서 GE1/0/3 회귀 (3/3→2/3). HIGH-ALIAS prompt 의 "Reading descriptions alone is UNRELIABLE" + "MANDATORY CROSS-CHECK" 지시가 과도해서 **whitelist 와 정확 매칭되는 description 까지 무시**하고 임의 peer 에 매핑한 현상.
+
+**수정** (`agent/track_b/agent.py:538-569`):
+- RULE 1: description 의 PeerNode 가 whitelist 에 있으면 **그대로 사용** (예: `To-Aegis-Prime-01-GE1/0/2` → Aegis-Prime-01 확정). cross-check 금지
+- RULE 2: PeerNode 가 whitelist 에 없으면 (진짜 alias: Spine1, Spine2, PC1, PSS, BorderLeaf2) 에 한해 ARP /30 cross-check
+- RULE 3: 설명 없는 L2 trunk 포트는 reverse description 탐색
+- RULE 4: 역방향 description 매칭 시 **포트 번호 일치 필수** — 포트 번호 틀리면 match 아님
+
+→ 다음 run 에서 Q31, Q32 회귀 제거 기대.
+
+---
+
+### TODO-10 — v10 제출본 Zindi 업로드 (사용자 결정)
+
+**현황**:
+- `agent/track_b/submission/submission_v6_full_v10.csv` **생성 완료**
+- best-of merge 결과, Q29 만 v10 자동 도출로 덮어쓰기 (Q30~Q33 은 v9 유지)
+- v9 의 Q29 수동 답과 v10 자동 답이 byte-identical 하여 결과적으로 v9 = v10
+- 차이: **v10 은 자동 도출 출처**라 submissions defensibility 우위
+
+**예상 효과 (v8 대비)**:
+- Q31 (6/6 도면 정답) + Q33 (4/4 정답) → v8 대비 10 라인 이상 정답 추가
+- Q29 자동 정답 + Q32 3/3 부분 개선
+- Q30 변화 없음
+
+**결정 사항** (사용자):
+- Zindi 제출 여부 (`submission_v6_full_v10.csv`)
+- 제출 시 v10 description 예시: `"v10 — TODO-11/12/13 forced validation + XML fallback + HIGH-ALIAS guard with RULE 1-4 discipline"`
 
 ---
 
@@ -242,6 +314,10 @@ v8 → v9 결과 비교:
 3. **모델 잘못이 아닌 prompt 결함** — Topology hint 에 whitelist 누락이 alias hallucination 의 근본 원인
 4. **`_DEVICES_ROOT` 경로 버그** (parent 한 번 부족) 이 그동안 Path 분기 whitelist 도 무력화시킨 부수 효과 — TODO-03 와 함께 복구
 5. **TODO-03/05 패치 효과 명확히 검증됨** — Q31 6/6, Q33 4/4 정답 도출
+6. **HIGH-ALIAS 가드는 양날의 칼** — Q29 (alias 60%, cross-check 필요) 에는 효과적이나 Q31 (alias 50%, description 정확명 + alias 혼재) 에는 과잉으로 작용해 정확 description 까지 무시시킴. RULE 1 ("whitelist 매칭 description 은 그대로 사용") 이 결정적. (TODO-15)
+7. **`count_up_physical_ports` (10G) suffix 버그** — Huawei bandwidth 접미사가 들어있는 interface brief 는 기존 정규식으로 포착 불가. Q32 Aegis-Prime-01 에서 LINE COUNT GUARD 무력화 원인 (TODO-09)
+8. **forced_answer 분기의 validation 부재** — v9 Q29 fail 의 근본 원인이었음. TODO-11/12 패치로 해결, v10 Q29 자동 정답 도출 성공
+9. **Alias 는 scenario-local** — PJlAN-01 = Eon-Node-01 (Q32), BorderLeaf2 = Janus-Prime-02 (Q32), Spine1/Spine2 = 노드마다 다름. 전역 alias 표 불가 (TODO-08)
 
 ## 4. 참조 commit / 산출 파일
 

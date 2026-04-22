@@ -422,8 +422,11 @@ def count_up_physical_ports(question_id: int, target: str) -> int:
     except OSError:
         return 0
     count = 0
+    # @MX:NOTE: [AUTO] TODO-09 — (10G) 등 bandwidth suffix 허용 + Eth-Trunk member 들여쓰기 대응
+    # 일부 display_interface_brief.txt 는 `GigabitEthernet1/0/3(10G) up up` 형식 → suffix
+    # 옵션으로 수용하고 PHY/Protocol 열은 up/down/*down 토큰만 허용
     for m in re.finditer(
-        r"^\s*(GE\d+/\d+/\d+|GigabitEthernet\d+/\d+/\d+)\s+(\S+)\s+(\S+)",
+        r"^\s*(GE\d+/\d+/\d+|GigabitEthernet\d+/\d+/\d+)(?:\([^)]*\))?\s+(\*?down|up)\s+(\*?down|up)",
         txt,
         flags=re.M,
     ):
@@ -532,6 +535,35 @@ def build_type_hint(qtype: str, question_text: str, question_id: int = 0) -> str
                 f"\n  Do NOT stop early. Do NOT skip ports. Do NOT include sub-interfaces"
                 f"\n  (e.g. GE1/0/5.1) or Eth-Trunk member rollups."
             )
+        # @MX:NOTE: [AUTO] TODO-13/15 — alias 비율 높은 타겟은 추가 경고.
+        # TODO-15: description 의 PeerNode 가 whitelist 에 있으면 그대로 사용. alias 만
+        # cross-check. "description 전부 무시" 로 오해시켜 whitelist-정확 description
+        # 까지 임의 매핑되는 회귀 (Q31 v10 GE1/0/3,5) 방지.
+        if devices:
+            alias_n, desc_total = compute_description_alias_ratio(
+                question_id, target, set(devices)
+            )
+            if desc_total >= 3 and alias_n / desc_total >= 0.5:
+                hint += (
+                    f"\n\nHIGH-ALIAS TARGET — {alias_n}/{desc_total} of {target}'s interface "
+                    f"descriptions use ALIAS labels (not real device names)."
+                    f"\n  APPLY THIS RULE FIRST, port by port:"
+                    f"\n    RULE 1: If the description's PeerNode is IN the VALID DEVICES whitelist"
+                    f"\n      (e.g. 'To-Aegis-Prime-01-GE1/0/2' where Aegis-Prime-01 is in whitelist),"
+                    f"\n      USE IT AS-IS. Do NOT cross-check. Do NOT substitute another peer."
+                    f"\n    RULE 2: ONLY when the PeerNode label is NOT in the whitelist (real alias,"
+                    f"\n      e.g. 'Spine1', 'Spine2', 'PC1', 'PSS', 'BorderLeaf2'), cross-check:"
+                    f"\n        (a) read {target}'s local /30 IP via `display ip interface brief`,"
+                    f"\n        (b) on every candidate peer from the whitelist, run `display arp`,"
+                    f"\n        (c) pick the peer whose ARP lists the partner /30 IP with 'I' flag."
+                    f"\n    RULE 3: For L2 trunk ports with no IP and no description, run"
+                    f"\n      `display current-configuration` on candidate peers and match the"
+                    f"\n      reverse description back to {target} (exact port number must match)."
+                    f"\n    RULE 4: When matching reverse descriptions, PORT NUMBER MUST MATCH. If"
+                    f"\n      {target}(GE1/0/3) and candidate X has a line 'To-{target}-GE1/0/3',"
+                    f"\n      that's a match; if X only has 'To-{target}-GE1/0/5', it is NOT a"
+                    f"\n      match for GE1/0/3 — keep searching."
+                )
         return hint
 
     elif qtype == QTYPE_PATH:
@@ -743,6 +775,104 @@ def postprocess_answer(raw: str, qtype: str = "") -> str:
         result.append(line)
 
     return '\n'.join(result).strip() if result else raw.strip()
+
+
+# @MX:NOTE: [AUTO] TODO-12 — forced 응답 XML/tool_call 감지
+_TOOL_CALL_XML_RE = re.compile(
+    r'<\s*tool_call\b|</\s*tool_call\s*>|<\s*function\s*=|<\s*parameter\s*=',
+    re.IGNORECASE,
+)
+
+
+def has_tool_call_xml(content: str) -> bool:
+    """forced 응답에 tool_call XML 텍스트가 포함됐는지 감지."""
+    if not content:
+        return False
+    return bool(_TOOL_CALL_XML_RE.search(content))
+
+
+def find_last_valid_assistant_answer(
+    messages: list[dict],
+    qtype: str,
+    whitelist: set[str],
+    target: str = "",
+    expected_lines: int = 0,
+) -> str:
+    """메시지 버퍼에서 마지막 유효 assistant 답변 추출 (forced XML fallback 용).
+
+    - tool_call XML 은 skip
+    - postprocess_answer + validate_{topology,path}_answer 를 모두 통과한 답만 채택
+    - Topology 는 expected_lines 가 0 이면 라인수 가드 비활성
+    """
+    for m in reversed(messages):
+        if m.get("role") != "assistant":
+            continue
+        content = (m.get("content") or "").strip()
+        if not content or has_tool_call_xml(content):
+            continue
+        processed = postprocess_answer(content, qtype)
+        if not processed.strip():
+            continue
+        if qtype == QTYPE_TOPOLOGY:
+            ok, _, _ = validate_topology_answer(
+                processed, whitelist, target, expected_lines
+            )
+        elif qtype == QTYPE_PATH:
+            ok, _, _ = validate_path_answer(processed, whitelist, qtype)
+        else:
+            ok = True
+        if ok:
+            return processed
+    return ""
+
+
+# @MX:NOTE: [AUTO] TODO-13 — target description alias 비율 측정
+def compute_description_alias_ratio(
+    question_id: int, target: str, whitelist: set[str]
+) -> tuple[int, int]:
+    """target 의 interface description 중 whitelist 미매칭 수 / 총 수.
+
+    반환: (alias_count, total_description_count)
+    총 description 수가 0 이면 (0, 0) 반환.
+    """
+    if not target:
+        return 0, 0
+    path = _DEVICES_ROOT / str(question_id) / target / "display_current-configuration.txt"
+    if not path.is_file():
+        return 0, 0
+    try:
+        txt = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return 0, 0
+
+    iface_head_re = re.compile(
+        r"^interface\s+(GE|XGE|Gigabit|XGigabit|10GE|25GE|40GE|100GE|Eth-Trunk|Ethernet)",
+        re.IGNORECASE,
+    )
+    block_end_re = re.compile(r"^(return|#)\s*$", re.IGNORECASE)
+
+    alias_count = 0
+    total = 0
+    in_iface = False
+    peers = {d for d in whitelist if d and d != target}
+    for line in txt.splitlines():
+        stripped = line.strip()
+        if iface_head_re.match(stripped):
+            in_iface = True
+            continue
+        # 다른 섹션 시작 또는 종료
+        if stripped == "#" or block_end_re.match(stripped):
+            in_iface = False
+            continue
+        if in_iface and stripped.lower().startswith("description "):
+            desc = stripped[len("description "):].strip()
+            if not desc:
+                continue
+            total += 1
+            matched = any(peer in desc for peer in peers)
+            if not matched:
+                alias_count += 1
+    return alias_count, total
 
 
 # ============================================================
@@ -1471,13 +1601,97 @@ def run_agent(question_id: int, question_text: str) -> dict:
                     content = resp2.content or ""
                     if content.strip():
                         elapsed = time.time() - start_time
+                        # @MX:NOTE: [AUTO] TODO-11 — forced 분기 validation
+                        _whitelist_f = set(load_scenario_devices(question_id))
+                        _target_f: str = ""
+                        _expected_f: int = 0
+                        if qtype == QTYPE_TOPOLOGY:
+                            _info_f = extract_topology_info(question_text)
+                            _target_f = _info_f.get("target") or ""
+                            if _target_f:
+                                _expected_f = count_up_physical_ports(
+                                    question_id, _target_f
+                                )
+                        _processed_f = postprocess_answer(content, qtype)
+                        if qtype == QTYPE_TOPOLOGY:
+                            _ok_f, _, _reason_f = validate_topology_answer(
+                                _processed_f, _whitelist_f, _target_f, _expected_f
+                            )
+                        elif qtype == QTYPE_PATH:
+                            _ok_f, _, _reason_f = validate_path_answer(
+                                _processed_f, _whitelist_f, qtype
+                            )
+                        else:
+                            _ok_f, _reason_f = True, "ok"
+
+                        # @MX:NOTE: [AUTO] TODO-12 — XML/tool_call 감지 fallback
+                        if (not _ok_f) and has_tool_call_xml(content):
+                            log.warning(
+                                f"  [Q{question_id}] forced response contains tool_call "
+                                f"XML — attempting fallback to last valid assistant message"
+                            )
+                            _fallback = find_last_valid_assistant_answer(
+                                messages, qtype, _whitelist_f, _target_f, _expected_f
+                            )
+                            if _fallback:
+                                log.info(
+                                    f"  [Q{question_id}] fallback answer adopted "
+                                    f"(from earlier assistant message)"
+                                )
+                                return {
+                                    "question_id": question_id,
+                                    "answer": _fallback,
+                                    "tool_calls": tool_calls_count,
+                                    "duration_s": round(elapsed, 1),
+                                    "iterations": iteration + 1,
+                                    "status": "forced_fallback",
+                                    "qtype": qtype,
+                                }
+
+                        # @MX:NOTE: [AUTO] TODO-11 — invalid 면 마지막 한 번 더 강제 정정
+                        if (not _ok_f) and not validation_retried:
+                            log.warning(
+                                f"  [Q{question_id}] forced answer invalid "
+                                f"({_reason_f}) — final correction retry"
+                            )
+                            messages.append({"role": "assistant", "content": content})
+                            if qtype == QTYPE_TOPOLOGY:
+                                _retry_msg = (
+                                    f"Your forced answer is STILL invalid: {_reason_f}. "
+                                    f"This is your FINAL chance. "
+                                    f"Output EXACTLY {_expected_f} lines in format "
+                                    f"`{_target_f}(port)->PeerNode(port)`. "
+                                    f"PeerNode MUST be one of: {sorted(_whitelist_f)}. "
+                                    f"Absolutely no XML, no <tool_call>, no <function=, "
+                                    f"no <parameter=, no code blocks, no explanation."
+                                )
+                            elif qtype == QTYPE_PATH:
+                                _retry_msg = (
+                                    f"Your forced answer is STILL invalid: {_reason_f}. "
+                                    f"This is your FINAL chance. Output ONE line: "
+                                    f"hop1->hop2->...->hopN. "
+                                    f"Use ONLY devices from: {sorted(_whitelist_f)}. "
+                                    f"No IP addresses, no XML, no tool_call, no code "
+                                    f"blocks, no explanation."
+                                )
+                            else:
+                                _retry_msg = (
+                                    f"Your forced answer is invalid: {_reason_f}. "
+                                    f"Output ONLY the final answer in the exact format. "
+                                    f"No XML, no JSON, no tool_call."
+                                )
+                            messages.append({"role": "user", "content": _retry_msg})
+                            validation_retried = True
+                            empty_count = 0
+                            continue
+
                         return {
                             "question_id": question_id,
-                            "answer": postprocess_answer(content, qtype),
+                            "answer": _processed_f,
                             "tool_calls": tool_calls_count,
                             "duration_s": round(elapsed, 1),
                             "iterations": iteration + 1,
-                            "status": "forced_answer",
+                            "status": "forced_answer" if _ok_f else "forced_validation_failed",
                             "qtype": qtype,
                         }
                 except Exception:

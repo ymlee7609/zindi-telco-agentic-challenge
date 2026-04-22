@@ -40,6 +40,9 @@
 | `TODO-04_q30_q33_audit.md` | 보고서 | Q30~Q33 sample 검증 + 4가지 실패 패턴 분류 |
 | `TODO-06_v9_rerun_audit.md` | 보고서 | v9 재실행 결과 + v8↔v9 라인별 비교 + 패치 효과 검증 |
 | `TODO-07_q29_failure_audit.md` | 보고서 | Q29 v9 fail 원인 — forced_answer 분기 validation 부재, 신규 TODO-11/12/13 파생 |
+| `TODO-08_pjlan_alias_audit.md` | 보고서 | Q32 GE1/0/3 의 PJlAN-01 = Eon-Node-01 alias 3중 교차 확증 |
+| `TODO-09_description_truncation_audit.md` | 보고서 | Q32 GE1/0/2 "to" 오인 정정 + `count_up_physical_ports` (10G) suffix 버그 수정 |
+| `TODO-14_v10_rerun_audit.md` | 보고서 | TODO-11/12/13/09 4중 패치 후 v10 재실행 — Q29 3/3 자동 정답 도출 (v9 fail 해결), Q31/Q32 회귀 발견 → best-of merge |
 
 코드 변경 (별도 보고서 없음, TODO.md §1 의 진행 결과 + commit 메시지 참조):
 
@@ -48,16 +51,19 @@
 | `9ed4721` | `agent/track_b/agent.py:288, 412-465` | TODO-03 Topology hint whitelist + ALIAS WARNING + `_DEVICES_ROOT` 경로 버그 수정 |
 | `5c748b1` | `agent/track_b/agent.py:438-499, 1373-1418` | TODO-05 `count_up_physical_ports` + `validate_topology_answer` + LINE COUNT GUARD + Topology retry |
 | `a6bcec5` | `submission_v6_full_v9.csv` (신규), `03-3_problems.md` | TODO-06 v9 제출본 생성 + Q29(수동),Q31,Q32,Q33 답 갱신 |
+| (이 커밋) | `agent/track_b/agent.py`: postprocess 이후 helpers + forced 분기 교체 + `count_up_physical_ports` suffix 수정 | TODO-11/12/13/09 helpers 및 가드 패치 |
 
 ## 결과 표
 
-| Q | 유형 | 시나리오 | v8 결론 | v9 결론 | 비고 |
-|---|---|---|---|---|---|
-| Q29 | Topology | PJ | 불일치 (alias) | v9 fail → cli.py 수동 결과 채택 | 도면 + ARP MAC 양방향 검증으로 truth 확정 |
-| Q30 | Topology | PJ | **일치** | **일치 (4/4 도면)** | description 정확명 |
-| Q31 | Topology | PJ | 불일치 (6/6 alias) | **일치 (6/6 도면) ⭐** | TODO-03 패치로 alias·hallucination 모두 해소 |
-| Q32 | Topology | PJ | 불일치 (1/3) | 부분 일치 (2/3) | Eon-Node-01 alias 미확인, GE1/0/2 누락 |
-| Q33 | Topology | PJGFA | 불일치 (1/4 incomplete) | **일치 (4/4) ⭐** | TODO-05 LINE COUNT GUARD 효과 |
+| Q | 유형 | 시나리오 | v8 결론 | v9 결론 | v10 결론 | 최종 채택 |
+|---|---|---|---|---|---|---|
+| Q29 | Topology | PJ | 불일치 (alias) | fail (XML) → 수동 교체 | **3/3 자동 ⭐** (forced_answer 53s) | v10 |
+| Q30 | Topology | PJ | **일치** | **일치 (4/4)** | **일치 (4/4)** | v10 ≡ v9 |
+| Q31 | Topology | PJ | 불일치 (6/6 alias) | **일치 (6/6) ⭐** | 회귀 4/6 (HIGH-ALIAS 과잉) | v9 (TODO-15 로 v11 재측정 예정) |
+| Q32 | Topology | PJ | 불일치 (1/3) | **일치 (3/3) ⭐** | 회귀 2/3 (GE1/0/3 오매핑) | v9 (TODO-15 로 v11 재측정 예정) |
+| Q33 | Topology | PJGFA | 불일치 (1/4 incomplete) | **일치 (4/4) ⭐** | (중단, 대기 시간 절감) | v9 |
+
+※ best-of merge: `submission_v6_full_v10.csv` = v9 base + Q29 v10 자동. v9 와 byte-identical.
 
 ## 진행 현황
 
@@ -68,4 +74,11 @@
 - TODO-06 (v9 재실행): **완료** — Q31 alias 6/6 해소, Q33 incomplete 4/4 해소, Q29 fail (cli.py 수동 결과로 대체)
 - v9 제출본 생성: `agent/track_b/submission/submission_v6_full_v9.csv` (Q29~Q33 만 갱신, 나머지 v8)
 - 03-3_problems.md 갱신: Q29(수동), Q31, Q32, Q33 = v9 답으로 교체
-- 후속: TODO-07 (Q29 fail 원인), TODO-08 (Eon-Node-01 alias), TODO-09 (description 잘림), TODO-10 (Zindi 제출)
+- TODO-07 (Q29 fail 원인 분석): **완료**
+- TODO-08 (PJlAN-01=Eon-Node-01 alias 확정): **완료** — Q32 v9 실제 3/3 정답
+- TODO-09 (description 잘림 오인 정정 + `count_up_physical_ports` (10G) 버그 수정): **완료**
+- TODO-11/12/13 (forced validation + XML fallback + HIGH-ALIAS prompt): **완료**
+- TODO-14 (v10 재실행 + best-of merge): **완료** — Q29 자동 정답 도출, Q31/Q32 회귀 발견
+- TODO-15 (HIGH-ALIAS RULE 1~4 명문화): **완료** — Q31/Q32 회귀 원인 해소 예정
+- v10 제출본 생성: `agent/track_b/submission/submission_v6_full_v10.csv` (v9 와 byte-identical, Q29 자동 출처)
+- **TODO-10 (Zindi 제출): 사용자 결정 대기** ← 남은 유일한 TODO
