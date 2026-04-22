@@ -407,6 +407,69 @@ def validate_path_answer(answer: str, whitelist: set[str], qtype: str) -> tuple[
     return True, first_line, "ok"
 
 
+# @MX:NOTE: [AUTO] TODO-05 — Topology 답 검증용 헬퍼 + validator
+def count_up_physical_ports(question_id: int, target: str) -> int:
+    """target 의 UP 물리 포트 수 (서브인터페이스·Eth-Trunk 제외).
+
+    cache 의 display_interface_brief.txt 를 직접 파싱.
+    빈 결과 반환 시 0 (라인 수 가드 비활성).
+    """
+    path = _DEVICES_ROOT / str(question_id) / target / "display_interface_brief.txt"
+    if not path.is_file():
+        return 0
+    try:
+        txt = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return 0
+    count = 0
+    for m in re.finditer(
+        r"^\s*(GE\d+/\d+/\d+|GigabitEthernet\d+/\d+/\d+)\s+(\S+)\s+(\S+)",
+        txt,
+        flags=re.M,
+    ):
+        iface = m.group(1)
+        if "." in iface:  # sub-interface 제외 (GE1/0/5.1 등)
+            continue
+        if m.group(2) == "up" and m.group(3) == "up":
+            count += 1
+    return count
+
+
+def validate_topology_answer(
+    answer: str,
+    whitelist: set[str],
+    target: str,
+    expected_lines: int,
+) -> tuple[bool, str, str]:
+    """Topology 답 포맷·라인수·alias 검증. 반환: (ok, cleaned, reason)."""
+    clean = re.sub(r"<[^>]+>", "", answer)
+    clean = re.sub(r"```[\s\S]*?```", "", clean)
+    clean = clean.strip()
+    if not clean:
+        return False, "", "empty answer"
+    lines = [ln.strip() for ln in clean.split("\n") if ln.strip()]
+
+    # 라인 수 가드: UP 포트 수와 일치해야 함 (expected_lines 가 0 이면 비활성)
+    if expected_lines and len(lines) != expected_lines:
+        return False, "\n".join(lines), (
+            f"line count {len(lines)} != UP physical ports {expected_lines}"
+        )
+
+    # 각 라인: TargetNode(port)->PeerNode(port)
+    for ln in lines:
+        m = re.match(r"^(\S+?)\(([^)]+)\)->(\S+?)\(([^)]+)\)$", ln)
+        if not m:
+            return False, "\n".join(lines), f"format error: {ln!r}"
+        local_dev, _local_port, peer_dev, _peer_port = m.groups()
+        if local_dev != target:
+            return False, "\n".join(lines), f"wrong target {local_dev!r} (expected {target!r})"
+        if peer_dev not in whitelist:
+            return False, "\n".join(lines), (
+                f"alias/hallucination: peer {peer_dev!r} not in VALID DEVICES"
+            )
+    return True, "\n".join(lines), "ok"
+
+
 def build_type_hint(qtype: str, question_text: str, question_id: int = 0) -> str:
     """질문 유형별 cold-start 힌트 생성 (user message로 주입)"""
     if qtype == QTYPE_TOPOLOGY:
@@ -459,6 +522,15 @@ def build_type_hint(qtype: str, question_text: str, question_id: int = 0) -> str
                 f"\n       (Interface = self-IP) is the real peer device"
                 f"\n    4) For L2 trunk ports without IP, query `display current-configuration`"
                 f"\n       on candidate peers and look for a description pointing back to {target}"
+            )
+        # @MX:NOTE: [AUTO] TODO-05 — 답 라인 수가 UP 물리 포트 수와 일치해야 함
+        up_ports = count_up_physical_ports(question_id, target)
+        if up_ports:
+            hint += (
+                f"\n\nLINE COUNT GUARD — {target} has EXACTLY {up_ports} UP physical ports."
+                f"\n  Your answer MUST contain EXACTLY {up_ports} lines (one per UP port)."
+                f"\n  Do NOT stop early. Do NOT skip ports. Do NOT include sub-interfaces"
+                f"\n  (e.g. GE1/0/5.1) or Eth-Trunk member rollups."
             )
         return hint
 
@@ -1283,9 +1355,19 @@ def run_agent(question_id: int, question_text: str) -> dict:
             elapsed = time.time() - start_time
             # [AUTO] P0 validation: detect hallucinated devices / XML / missing arrow
             _whitelist = set(load_scenario_devices(question_id))
-            _ok, _clean, _reason = validate_path_answer(
-                postprocess_answer(content, qtype), _whitelist, qtype
-            )
+            _processed = postprocess_answer(content, qtype)
+            _target: str = ""
+            _expected: int = 0
+            if qtype == QTYPE_TOPOLOGY:
+                _info = extract_topology_info(question_text)
+                _target = _info.get("target") or ""
+                _expected = count_up_physical_ports(question_id, _target) if _target else 0
+                _ok, _clean, _reason = validate_topology_answer(
+                    _processed, _whitelist, _target, _expected
+                )
+            else:
+                _ok, _clean, _reason = validate_path_answer(_processed, _whitelist, qtype)
+
             if not _ok and qtype == QTYPE_PATH and not validation_retried:
                 log.warning(f"  [Q{question_id}] Answer invalid ({_reason}) — correction retry")
                 messages.append({"role": "assistant", "content": content})
@@ -1297,6 +1379,23 @@ def run_agent(question_id: int, question_text: str) -> dict:
                         f"Use ONLY devices from the whitelist: {sorted(_whitelist)}. "
                         f"No IP addresses, no XML, no tool_call, no code blocks, no explanation. "
                         f"If uncertain, output your best partial path from the routing data you already read."
+                    ),
+                })
+                validation_retried = True
+                continue
+            if not _ok and qtype == QTYPE_TOPOLOGY and not validation_retried:
+                log.warning(f"  [Q{question_id}] Topology answer invalid ({_reason}) — correction retry")
+                messages.append({"role": "assistant", "content": content})
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        f"Your topology answer is invalid: {_reason}. "
+                        f"Output EXACTLY {_expected} lines in format "
+                        f"`{_target}(port)->PeerNode(port)`. "
+                        f"PeerNode MUST be one of the VALID DEVICES whitelist: {sorted(_whitelist)}. "
+                        f"If a description shows an alias not in the whitelist, resolve it via ARP "
+                        f"MAC matching as instructed. "
+                        f"No XML, no code blocks, no explanation, no extra lines."
                     ),
                 })
                 validation_retried = True
