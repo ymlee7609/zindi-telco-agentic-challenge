@@ -33,7 +33,9 @@
 |---|---|
 | `v8_mapping_audit.md` | 50문제 매핑 진단 + 정정 절차 + 매핑 표 |
 | `Q29_topology_PJ.md` | PJ Topology Q29 cli.py 풀이 + v8 정답 비교 + 사용자 확인(Spine=Janus-Prime) |
-| `TODO.md` | 후속 조사 과제 (Qwen alias 사용 원인, 데이터 vs 토폴로지 모순) |
+| `TODO.md` | 후속 조사 과제 색인 (TODO-01~04) |
+| `TODO-01_qwen_alias_audit.md` | Qwen alias 사용 원인 (description 자체가 alias + Topology hint whitelist 누락) |
+| `TODO-02_topology_audit.md` | 도면 vs ARP vs description 비교 → 도면 truth 확인, alias 매핑 표 |
 
 ## 결과 표
 

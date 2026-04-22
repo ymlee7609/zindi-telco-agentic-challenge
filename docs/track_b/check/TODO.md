@@ -81,7 +81,16 @@ PJ Spine 위치 장비에 대해 세 출처가 서로 다른 답을 가리킴:
 
 ## 진행 현황
 
-| ID | 제목 | 우선순위 | 상태 |
-|---|---|---|---|
-| TODO-01 | Qwen 모델의 alias 사용 원인 분석 | High | 미착수 |
-| TODO-02 | 시뮬레이션 데이터 vs 토폴로지 정의 모순 해소 | High | 미착수 |
+| ID | 제목 | 우선순위 | 상태 | 결과 보고서 |
+|---|---|---|---|---|
+| TODO-01 | Qwen 모델의 alias 사용 원인 분석 | High | **완료** | `TODO-01_qwen_alias_audit.md` |
+| TODO-02 | 시뮬레이션 데이터 vs 토폴로지 정의 모순 해소 | High | **완료** | `TODO-02_topology_audit.md` |
+| TODO-03 | agent.py Topology hint 에 device whitelist 주입 (P0 코드 수정) | High | 미착수 | — |
+| TODO-04 | Q30~Q33 v8 정답 sample 검증 (PJ Topology alias 영향 범위) | Medium | 미착수 | — |
+
+## 핵심 발견 요약 (2026-04-22)
+
+- **Q29 의 alias 출력은 모델 잘못이 아님** — Demeter-Prime-01 의 description 자체가 alias (`To-Spine2-GE1/0/2`). 모델은 SYSTEM_PROMPT 의 "Never invent device names" 룰을 충실히 지켜 description 의 라벨을 정직하게 출력
+- **근본 원인**: `agent/track_b/agent.py:412-437` 의 Topology hint 분기에 device whitelist 주입이 빠져 있음 (Path 분기에는 line 462-471 에 있음)
+- **사용자 정의 "Spine = Janus-Prime"은 PJ Area 일반 truth 이지만 Q29 답과는 별개** — Demeter-Prime-01 의 직접 peer 는 Atlas-Prime (Leaf 계층). description 의 "Spine1/Spine2"는 운영자가 잘못 적은 alias
+- **올바른 Q29 답** (도면 + ARP 양방향 검증): `Demeter-Prime-01(GE1/0/0)->Atlas-Prime-01(GE1/0/2)`, `(GE1/0/1)->Atlas-Prime-02(GE1/0/2)`, `(GE1/0/5)->Hermes-Prime-01(GE1/0/4)`
