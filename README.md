@@ -61,13 +61,13 @@ export HF_TOKEN="hf_your_token_here"
 
 ```bash
 # Single question test
-python agent/agent.py -i "data/Track B/data/Phase_1/test.json" --questions 1
+python agent/track_b/agent.py -i "data/Track B/data/Phase_1/test.json" --questions 1
 
 # Full evaluation (50 questions)
-python agent/agent.py -i "data/Track B/data/Phase_1/test.json"
+python agent/track_b/agent.py -i "data/Track B/data/Phase_1/test.json"
 
 # Fresh run (ignore previous results)
-python agent/agent.py -i "data/Track B/data/Phase_1/test.json" --fresh
+python agent/track_b/agent.py -i "data/Track B/data/Phase_1/test.json" --fresh
 ```
 
 ## Project Structure

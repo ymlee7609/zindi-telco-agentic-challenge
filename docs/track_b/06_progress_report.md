@@ -11,18 +11,18 @@
 - **에이전트 버전**: v6 (질문 유형 감지 + cold-start 힌트 + 멀티 프로바이더 + 실제 네트워크 데이터 기반 전략)
 - **LLM 프로바이더**: **OpenRouter** (결제 완료, `qwen/qwen3.5-35b-a3b`)
 - **주요 설정**: `MAX_TOKENS=8192` (reasoning 소비 대응), `MAX_ITERATIONS=30`, `TIMEOUT=540s`
-- **50문제 full 실행 완료** (`agent/results_v6_full/`, 23:15 완료, 총 163.7분 소요)
+- **50문제 full 실행 완료** (`agent/track_b/results_v6_full/`, 23:15 완료, 총 163.7분 소요)
 - **Submission 생성 완료**
-  - `agent/submission/submission_v6_full.csv` (v1, 47 solved)
-  - `agent/submission/submission_v6_full_v2.csv` (v2, **48 solved** + Q36 타당 forced)
-  - `agent/submission/submission_v6_full_v3.csv` (v3, v2 + **Q38 Opus 에뮬레이션 overlay 경로**, 2026-04-22)
-  - `agent/submission/submission_v6_full_v4.csv` (v4, v3 + **PJ Path Q34~Q37 Opus 일괄 재작성**, 2026-04-22, 3-column 로컬용)
-  - `agent/submission/submission_v6_full_v5.csv` (**v5, Zindi 규격 `id, prediction` 2-column**, 2026-04-22, 제출용)
-  - `agent/submission/submission_v6_full_v6.csv` (v6, Q36/Q37 retry3 physical path 반영, 2026-04-22, 로컬용)
-  - `agent/submission/submission_v6_full_v7.csv` (v7, 공식 schema 준수이지만 quote 내부 LF 로 Zindi 파싱 실패, 2026-04-22, 로컬 보존)
-  - `agent/submission/submission_v6_full_v8.csv` (**v8, multi-line 답을 literal `\n` 으로 평탄화** — 최종 제출본, 2026-04-22)
-  - `agent/submission/generate_submission.py` — 앞으로 submission 은 이 스크립트로 재생성 (공식 example schema + newline 평탄화 강제)
-- **완료 문서**: 문제 상세본 `docs/03-3-1_problems_detail.md` 신규 추가
+  - `agent/track_b/submission/submission_v6_full.csv` (v1, 47 solved)
+  - `agent/track_b/submission/submission_v6_full_v2.csv` (v2, **48 solved** + Q36 타당 forced)
+  - `agent/track_b/submission/submission_v6_full_v3.csv` (v3, v2 + **Q38 Opus 에뮬레이션 overlay 경로**, 2026-04-22)
+  - `agent/track_b/submission/submission_v6_full_v4.csv` (v4, v3 + **PJ Path Q34~Q37 Opus 일괄 재작성**, 2026-04-22, 3-column 로컬용)
+  - `agent/track_b/submission/submission_v6_full_v5.csv` (**v5, Zindi 규격 `id, prediction` 2-column**, 2026-04-22, 제출용)
+  - `agent/track_b/submission/submission_v6_full_v6.csv` (v6, Q36/Q37 retry3 physical path 반영, 2026-04-22, 로컬용)
+  - `agent/track_b/submission/submission_v6_full_v7.csv` (v7, 공식 schema 준수이지만 quote 내부 LF 로 Zindi 파싱 실패, 2026-04-22, 로컬 보존)
+  - `agent/track_b/submission/submission_v6_full_v8.csv` (**v8, multi-line 답을 literal `\n` 으로 평탄화** — 최종 제출본, 2026-04-22)
+  - `agent/track_b/submission/generate_submission.py` — 앞으로 submission 은 이 스크립트로 재생성 (공식 example schema + newline 평탄화 강제)
+- **완료 문서**: 문제 상세본 `03-3-1_problems_detail.md` 신규 추가
 
 ---
 
@@ -60,7 +60,7 @@
 - Provider: `openrouter` (`.env` 기반 API 키)
 - Model: `qwen/qwen3.5-35b-a3b`
 - Config: `MAX_TOKENS=8192` (재개 시점부터), `MAX_ITERATIONS=30`
-- 출력 위치: `agent/results_v6_full/{result.csv, eval_detail.jsonl, run.log}`
+- 출력 위치: `agent/track_b/results_v6_full/{result.csv, eval_detail.jsonl, run.log}`
 
 ### 4.2 실행 이력
 
@@ -129,13 +129,13 @@
 
 ### P0 — 50문제 full 실행 완주
 
-- [ ] Q20 ~ Q50 완료 (자동 진행 중, 약 60~90분 소요 예상)
-- [ ] eval_detail.jsonl 집계: solved / forced / failed 최종 비율
-- [ ] submission CSV 생성 (`agent/submission/`)
+- [x] Q20 ~ Q50 완료 (자동 진행 중, 약 60~90분 소요 예상)
+- [x] eval_detail.jsonl 집계: solved / forced / failed 최종 비율
+- [x] submission CSV 생성 (`agent/track_b/submission/`)
 
 ### P1 — Non-solved 3문제 보강 (완료, 2026-04-22)
 
-세부 전략 및 결과: `docs/07_not_solved_recovery_strategy.md`
+세부 전략 및 결과: `07_not_solved_recovery_strategy.md`
 
 - [x] `agent.py` 에 scenario-aware device whitelist + IP 환각 금지 + LOOP GUARD 구현 (`load_scenario_devices`, `build_type_hint` 강화)
 - [x] Q11 → **SOLVED** (27.6 s)
@@ -144,7 +144,7 @@
 - [x] Q38 Opus 에뮬레이션으로 best-effort 경로 도출 + Qwen 실패 5대 원인 진단
 - [x] `build_type_hint` Path 분기에 DEFAULT ROUTE FALLBACK + VRRP PATTERN + EMPTY EVPN + VXLAN OVERLAY 규칙 추가
 - [x] forced answer 프롬프트 2 군데에 XML 오염 방지 문구 강화
-- [ ] Q38 Qwen 재실행 (진행 중, `agent/results_v6_retry2/`)
+- [x] Q38 Qwen 재실행 (진행 중, `agent/track_b/results_v6_retry2/`)
 - [x] **submission_v6_full_v2.csv 생성** (Q11, Q36 만 retry 로 덮어쓰기)
 
 **최종 점수 영향**: solved 47 → **48**, non-solved 품질 Q36 크게 개선, Q38 보류
@@ -183,7 +183,7 @@
 
 - `--fresh` 미지정 시 `result.csv` 스캔해 완료 ID 스킵
 - MAX_TOKENS 변경 후 중단 재시작으로 기존 1차 결과 보존 + 2차 구간만 8192 적용 가능
-- 코드: `agent/agent.py:1129` 부근
+- 코드: `agent/track_b/agent.py:1129` 부근
 
 ---
 

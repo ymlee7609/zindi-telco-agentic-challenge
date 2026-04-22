@@ -41,13 +41,13 @@
 ## Phase 2: 에이전트 구조 개선 (직접 풀이 결과 기반)
 
 ### 2-1. 시스템 프롬프트 개선
-- **파일**: `agent/agent.py` SYSTEM_PROMPT
+- **파일**: `agent/track_b/agent.py` SYSTEM_PROMPT
 - 실제 데이터 기반 전략 구체화
 - 불필요한 커맨드 제거, 핵심 커맨드 우선순위화
 - 응답 크기가 큰 커맨드 주의사항 추가
 
 ### 2-2. 컨텍스트 관리 개선
-- **파일**: `agent/agent.py` run_agent()
+- **파일**: `agent/track_b/agent.py` run_agent()
 - 라우팅 테이블/설정 결과를 요약/축약하는 로직
 - 이전 iteration 결과를 압축하는 메커니즘
 - TPM 한도 초과 방지
@@ -70,9 +70,9 @@
 
 ## Critical Files
 
-- `agent/agent.py` - 메인 에이전트 (SYSTEM_PROMPT, run_agent, postprocess_answer)
+- `agent/track_b/agent.py` - 메인 에이전트 (SYSTEM_PROMPT, run_agent, postprocess_answer)
 - `data/Track B/data/Phase_1/test.json` - 50개 문제 데이터
-- `agent/results_v5_groq/` - 현재 최선 결과
+- `agent/track_b/results_v5_groq/` - 현재 최선 결과
 - `agent/results/result.csv` - v1 참조 결과
 
 ## Verification

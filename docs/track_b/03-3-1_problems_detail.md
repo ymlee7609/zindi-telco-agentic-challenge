@@ -440,7 +440,7 @@ Beta-Node-01;GE1/0/2;interface IP error
 ## 7. 참고 파일
 
 - 원본 데이터: `data/Track B/data/Phase_1/test.json`
-- 상위 분석: `docs/03-3_problems.md`
-- 네트워크 구조: `docs/03-2_topology.md`, `docs/03-2_topology_pj.svg`, `docs/03-2_topology_traditional.svg`
-- 전략: `docs/05_track_b_strategy.md`
-- 진행 리포트: `docs/06_progress_report.md`
+- 상위 분석: `03-3_problems.md`
+- 네트워크 구조: `03-2_topology.md`, `03-2_topology_pj.svg`, `03-2_topology_traditional.svg`
+- 전략: `05_track_b_strategy.md`
+- 진행 리포트: `06_progress_report.md`

@@ -109,7 +109,7 @@ Beta-Node-03->Beta-Axis-02->Beta-Portal-02->Alpha-Center-02
 | 항목 | 내용 |
 |---|---|
 | 대상 | Q11 |
-| 실행 | `python agent/agent.py --provider openrouter --questions 11 -o agent/results_v6_retry --fresh` (단독) |
+| 실행 | `python agent/track_b/agent.py --provider openrouter --questions 11 -o agent/track_b/results_v6_retry --fresh` (단독) |
 | 예상 성공률 | **90%+** |
 | 소요 | ~30s |
 | 비용 | <$0.01 |
@@ -117,7 +117,7 @@ Beta-Node-03->Beta-Axis-02->Beta-Portal-02->Alpha-Center-02
 
 ### 전략 B — PJ/PJGFA Cold-start 힌트 강화 (Q36, Q38 공통)
 
-**변경 지점**: `agent/agent.py` 의 `build_coldstart_hint` (line 289~) path 분기
+**변경 지점**: `agent/track_b/agent.py` 의 `build_coldstart_hint` (line 289~) path 분기
 
 **추가 내용**
 1. PJ 영역 노드 화이트리스트 주입:
@@ -194,14 +194,14 @@ OpenRouter 에 있는 비-thinking 계열:
 
 **Step 1. Q11 재실행 (전략 A)**
 ```bash
-python agent/agent.py --provider openrouter --questions 11 \
-  -o agent/results_v6_retry --fresh
+python agent/track_b/agent.py --provider openrouter --questions 11 \
+  -o agent/track_b/results_v6_retry --fresh
 ```
 - 결과 확인 후 solved 면 submission 병합
 
 **Step 2. 프롬프트 강화 (전략 B)**
 - `build_coldstart_hint` path 분기에 PJ 화이트리스트 + IP 환각 금지 + 중복 금지 규칙 추가
-- smoke: `python agent/agent.py --questions 36,38 -o agent/results_v6_retry --fresh`
+- smoke: `python agent/track_b/agent.py --questions 36,38 -o agent/track_b/results_v6_retry --fresh`
 
 ### Phase 2: 프롬프트 강화 효과 검증
 
@@ -217,8 +217,8 @@ Step 2 결과 평가:
 
 ### Phase 4: 최종 submission 병합
 
-- `agent/results_v6_full/result.csv` 기준으로 Q11/Q36/Q38 만 재실행 결과로 덮어쓰기
-- `agent/submission/submission_v6_full_v2.csv` 생성
+- `agent/track_b/results_v6_full/result.csv` 기준으로 Q11/Q36/Q38 만 재실행 결과로 덮어쓰기
+- `agent/track_b/submission/submission_v6_full_v2.csv` 생성
 
 ---
 
@@ -258,7 +258,7 @@ Step 2 결과 평가:
 
 ### 8.1 적용된 변경
 
-`agent/agent.py` 에 다음 2가지 개선 반영 (전략 A + B + C 일부 통합):
+`agent/track_b/agent.py` 에 다음 2가지 개선 반영 (전략 A + B + C 일부 통합):
 
 1. **`load_scenario_devices(qid)` 신설** (line 288 부근)
    - `data/Track B/devices_outputs/{qid}/` 스캔으로 시나리오별 실제 장비 목록 수집
@@ -273,8 +273,8 @@ Step 2 결과 평가:
 
 명령:
 ```bash
-python agent/agent.py --provider openrouter --questions 11,36,38 \
-  -o agent/results_v6_retry --fresh
+python agent/track_b/agent.py --provider openrouter --questions 11,36,38 \
+  -o agent/track_b/results_v6_retry --fresh
 ```
 
 ### 8.3 결과 (2026-04-22 완료)
@@ -293,12 +293,12 @@ python agent/agent.py --provider openrouter --questions 11,36,38 \
 
 ### 8.4 Submission v2 병합
 
-- 베이스: `agent/results_v6_full/result.csv` (50문제)
-- 덮어쓰기: Q11, Q36 → `agent/results_v6_retry/result.csv` 값
+- 베이스: `agent/track_b/results_v6_full/result.csv` (50문제)
+- 덮어쓰기: Q11, Q36 → `agent/track_b/results_v6_retry/result.csv` 값
 - 유지: Q38 (v6_full 빈 답)
 - 산출물
-  - `agent/results_v6_merged/result.csv` (내부 병합본)
-  - `agent/submission/submission_v6_full_v2.csv` (Zindi 제출 포맷, 50/50 filled)
+  - `agent/track_b/results_v6_merged/result.csv` (내부 병합본)
+  - `agent/track_b/submission/submission_v6_full_v2.csv` (Zindi 제출 포맷, 50/50 filled)
 
 ### 8.5 최종 상태
 
@@ -357,7 +357,7 @@ Hermes-Prime-01->Demeter-Prime-01->Atlas-Prime-01->Janus-Prime-01->Aegis-Node-01
 
 ### 9.5 Qwen 개선 프롬프트 패치 (제안)
 
-`agent/agent.py` `build_type_hint` Path 분기에 추가:
+`agent/track_b/agent.py` `build_type_hint` Path 분기에 추가:
 
 ```python
 hint += (
@@ -404,24 +404,24 @@ if iteration > 10 and empty_count > 2 and qtype == QTYPE_PATH:
 
 ### 9.8 Submission 포맷 최종 확정 [중요]
 
-**공식 규격**: `agent/submission/submission_example.csv` 기준 `ID, Track A, Track B` 3-column, 550 rows.
+**공식 규격**: `agent/common/submission_example.csv` 기준 `ID, Track A, Track B` 3-column, 550 rows.
 
 - v1~v4: `scenario_id, Track A, Track B` → header 이름 미스매치 (ID column missing 에러)
 - v5~v6: `id, prediction` 2-column → guideline.md 의 로컬-eval 포맷을 Zindi 업로드 포맷으로 오해
 - **v7 이상**: 공식 example schema 준수, 제출 가능
 
-앞으로 submission 은 `agent/submission/generate_submission.py` 로 생성 (공식 schema 강제).
+앞으로 submission 은 `agent/track_b/submission/generate_submission.py` 로 생성 (공식 schema 강제).
 
 ### 9.8.1 Submission 갱신 결과
 
-- `agent/submission/submission_v6_full_v3.csv` 신규 생성
+- `agent/track_b/submission/submission_v6_full_v3.csv` 신규 생성
   - 베이스: `submission_v6_full_v2.csv`
   - Q38 Track B 값만 Opus 에뮬레이션 경로로 교체
-- `agent/submission/NOTES.md` 신설 (unverified 라벨)
+- `agent/track_b/submission/NOTES.md` 신설 (unverified 라벨)
 
 ### 9.9 Qwen 개선안 적용 및 재실행 (2026-04-22)
 
-§9.5·9.6 에서 제안한 개선안을 `agent/agent.py` 에 실제 반영:
+§9.5·9.6 에서 제안한 개선안을 `agent/track_b/agent.py` 에 실제 반영:
 
 **Path 분기 힌트 확장** (`build_type_hint`, line 374 부근)
 - DEFAULT ROUTE FALLBACK 3-step 절차 주입
@@ -436,8 +436,8 @@ if iteration > 10 and empty_count > 2 and qtype == QTYPE_PATH:
 
 **재실행 방식**
 ```bash
-python agent/agent.py --provider openrouter --questions 38 \
-  -o agent/results_v6_retry2 --fresh
+python agent/track_b/agent.py --provider openrouter --questions 38 \
+  -o agent/track_b/results_v6_retry2 --fresh
 ```
 
 결과는 섹션 9.10 에 기록 예정 (실행 중 → 완료 후 갱신).
@@ -446,13 +446,13 @@ python agent/agent.py --provider openrouter --questions 38 \
 
 v6_full 결과를 `->` / 환각 장비 / 빈 답 기준으로 스캔한 결과, **PJ Path 전 5문제 (Q34~Q38) 모두 품질 의심**으로 확인:
 
-| Q | Qwen 상태 | 문제 | Opus v4 답 |
-|---|----------|------|-----------|
-| Q34 | solved `Hermes-Prime-01` | no-arrow, hops=1 | `Hermes-Prime-01->Demeter-Prime-01->Hermes-Prime-02` |
-| Q35 | solved `...->Hermes-Spine-01->Hermes-Leaf-01->20.1.1.10` | 환각 장비 + IP end | `Hermes-Prime-01->Demeter-Prime-01->Demeter-Node-01->Hermes-Node-01` |
-| Q36 | retry forced `...->Atlas-Node-01->Hermes-Prime-01` | Atlas 건너뛰기 오류 | `Hermes-Node-01->Demeter-Node-01->Demeter-Prime-01->Hermes-Prime-01` |
-| Q37 | solved `Hermes-Node-01` | no-arrow, hops=1 | `Hermes-Node-01->Demeter-Node-01->Hermes-Node-02` |
-| Q38 | retry2 XML 오염 | tool_call leak | `Hermes-Prime-01->Demeter-Prime-01->Demeter-Node-02->Hermes-Node-02` |
+| Q   | Qwen 상태                                                  | 문제               | Opus v4 답                                                            |
+| --- | -------------------------------------------------------- | ---------------- | -------------------------------------------------------------------- |
+| Q34 | solved `Hermes-Prime-01`                                 | no-arrow, hops=1 | `Hermes-Prime-01->Demeter-Prime-01->Hermes-Prime-02`                 |
+| Q35 | solved `...->Hermes-Spine-01->Hermes-Leaf-01->20.1.1.10` | 환각 장비 + IP end   | `Hermes-Prime-01->Demeter-Prime-01->Demeter-Node-01->Hermes-Node-01` |
+| Q36 | retry forced `...->Atlas-Node-01->Hermes-Prime-01`       | Atlas 건너뛰기 오류    | `Hermes-Node-01->Demeter-Node-01->Demeter-Prime-01->Hermes-Prime-01` |
+| Q37 | solved `Hermes-Node-01`                                  | no-arrow, hops=1 | `Hermes-Node-01->Demeter-Node-01->Hermes-Node-02`                    |
+| Q38 | retry2 XML 오염                                            | tool_call leak   | `Hermes-Prime-01->Demeter-Prime-01->Demeter-Node-02->Hermes-Node-02` |
 
 **Qwen 개선안 적용 재실행 결과 (Q38만)**
 - retry2 답: `<tool_call>\n<function=execute_cli_command>...` (XML 오염 **재발**)
@@ -609,7 +609,7 @@ if empty_count >= 2 or xml_detected_in_answer:
 
 ### 11.8 적용 결과 (2026-04-22 완료)
 
-`agent/results_v6_retry3/` 에 Q34~Q38 단독 재실행.
+`agent/track_b/results_v6_retry3/` 에 Q34~Q38 단독 재실행.
 
 | Q | retry3 결과 | Opus v4 대비 | 판정 |
 |---|-------------|-------------|------|
@@ -636,8 +636,8 @@ if empty_count >= 2 or xml_detected_in_answer:
 
 ## 12. 참고
 
-- 실행 로그: `agent/results_v6_full/run.log`
-- 평가 로그: `agent/results_v6_full/eval_detail.jsonl`
-- 현재 submission: `agent/submission/submission_v6_full.csv`
-- 문제 상세: `docs/03-3-1_problems_detail.md` (Q11, Q36, Q38 원문)
-- 에이전트 코드: `agent/agent.py:289` (build_coldstart_hint)
+- 실행 로그: `agent/track_b/results_v6_full/run.log`
+- 평가 로그: `agent/track_b/results_v6_full/eval_detail.jsonl`
+- 현재 submission: `agent/track_b/submission/submission_v6_full.csv`
+- 문제 상세: `03-3-1_problems_detail.md` (Q11, Q36, Q38 원문)
+- 에이전트 코드: `agent/track_b/agent.py:289` (build_coldstart_hint)

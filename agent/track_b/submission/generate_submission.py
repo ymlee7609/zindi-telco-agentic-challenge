@@ -18,12 +18,17 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import sys
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parent.parent.parent
+ROOT = Path(__file__).resolve().parents[3]
 TEST_JSON = ROOT / "data" / "Track B" / "data" / "Phase_1" / "test.json"
-EXAMPLE = ROOT / "agent" / "submission" / "submission_example.csv"
+EXAMPLE = ROOT / "agent" / "common" / "submission_example.csv"
+
+# common/submission/merge_submission.py 를 import 하여 combined CSV 자동 갱신
+sys.path.insert(0, str(ROOT / "agent" / "common" / "submission"))
+from merge_submission import update_track  # noqa: E402
 
 
 def load_id_to_scenario() -> dict[int, str]:
@@ -53,7 +58,8 @@ def load_predictions(path: Path) -> dict[int, str]:
     return preds
 
 
-def build_submission(pred_files: list[Path], out_path: Path) -> None:
+def build_submission(pred_files: list[Path], out_path: Path,
+                     update_combined: bool = True) -> None:
     id_to_sid = load_id_to_scenario()
 
     merged: dict[int, str] = {}
@@ -90,6 +96,10 @@ def build_submission(pred_files: list[Path], out_path: Path) -> None:
     print(f"Wrote {out_path}")
     print(f"Rows: {len(body)}, Track B filled: {filled}")
 
+    if update_combined:
+        # common/submission/submission_combined.csv 의 Track B 열 갱신
+        update_track("B", sid_to_pred, verbose=True)
+
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Build Zindi submission CSV")
@@ -99,10 +109,12 @@ def main() -> None:
                     help="Additional result.csv files to override base (order matters)")
     ap.add_argument("--out", required=True, type=Path,
                     help="Output submission CSV path")
+    ap.add_argument("--skip-combined", action="store_true",
+                    help="Skip updating agent/common/submission/submission_combined.csv")
     args = ap.parse_args()
 
     files = [args.results, *args.override]
-    build_submission(files, args.out)
+    build_submission(files, args.out, update_combined=not args.skip_combined)
 
 
 if __name__ == "__main__":

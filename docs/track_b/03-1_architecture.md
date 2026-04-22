@@ -1,6 +1,6 @@
 # Agent Architecture
 
-> `agent/agent.py` 구조 설명서
+> `agent/track_b/agent.py` 구조 설명서
 > 최종 업데이트: 2026-04-14 | 버전: v4
 
 ## 1. 전체 흐름
@@ -279,19 +279,19 @@ flowchart LR
 
 ```bash
 # 기본 실행 (OpenRouter, 전체 50문제)
-python agent/agent.py
+python agent/track_b/agent.py
 
 # 특정 문제만
-python agent/agent.py --questions 1,2,7,39
+python agent/track_b/agent.py --questions 1,2,7,39
 
 # 프로바이더 변경
-python agent/agent.py --provider local
+python agent/track_b/agent.py --provider local
 
 # 새로 시작 (이전 결과 무시)
-python agent/agent.py --fresh
+python agent/track_b/agent.py --fresh
 
 # 입출력 경로 변경
-python agent/agent.py -i data/test.json -o results/run1
+python agent/track_b/agent.py -i data/test.json -o results/run1
 ```
 
 ## 6. 변경 이력

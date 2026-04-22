@@ -62,13 +62,13 @@ export HF_TOKEN="hf_your_token_here"
 
 ```bash
 # 단일 문제 테스트
-python agent/agent.py -i "data/Track B/data/Phase_1/test.json" --questions 1
+python agent/track_b/agent.py -i "data/Track B/data/Phase_1/test.json" --questions 1
 
 # 전체 평가 (50문제)
-python agent/agent.py -i "data/Track B/data/Phase_1/test.json"
+python agent/track_b/agent.py -i "data/Track B/data/Phase_1/test.json"
 
 # 처음부터 실행 (이전 결과 무시)
-python agent/agent.py -i "data/Track B/data/Phase_1/test.json" --fresh
+python agent/track_b/agent.py -i "data/Track B/data/Phase_1/test.json" --fresh
 ```
 
 ## 프로젝트 구조
