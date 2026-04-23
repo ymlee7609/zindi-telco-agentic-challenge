@@ -15,16 +15,29 @@
 ## 현황 요약
 
 - **최신 Zindi 제출본**: `submission_v12_topofault_rt.csv` (serial 016, 점수 0.44)
-- **신규 제출 대기**: `submission_017_20260423_topo_newline_fix.csv` (TOPO `\n` 포맷 수정)
+- **017 상태**: **INVALID — 제출 금지** (아래 교훈 참조)
 - **다음 serial**: 018
 
 ## 제출 이력 (Zindi에 실제 제출된 것)
 
 | Serial | File | 제출일 | Zindi 점수 | 비고 |
 |---|---|---|---|---|
-| 017 | `submission_017_20260423_topo_newline_fix.csv` | 2026-04-23 | 미제출 | base=016, TOPO 11개 literal `\n` → 실제 개행 |
+| 017 | `submission_017_20260423_topo_newline_fix.csv` | — | **무효 (제출 금지)** | 잘못된 전제로 생성. literal `\n` → 실제 개행 변환은 Zindi 공식 포맷 위반 |
 | 016 | `submission_v12_topofault_rt.csv` | 2026-04-23 | **0.44** | 현재 최고점 (베이스라인) |
 | 이전 | (기록 없음 — 사용자 확인 후 추가 필요) | — | — | — |
+
+## Zindi 공식 포맷 스펙 (중요)
+
+`agent/common/submission_example.csv` 가 Zindi 공식 포맷 예시. Track B multi-line 답변 (TOPO 여러 링크, FAULT 여러 reason) 은 **literal `\n` (backslash + n 두 문자)** 을 구분자로 사용.
+
+예 (example 507 line):
+```
+Atlas-Prime-01->Gaia-Node-01->Eon-Node-01\nAtlas-Prime-01\nGaia-Node-01->Demeter-Prime-01->Eon-Node-01
+```
+
+`\n` 이 실제 개행 문자가 아님. CSV 값 안에 literal backslash + n 이 저장됨.
+
+**결론**: `submission_v12_topofault_rt.csv` 의 literal `\n` 포맷은 이미 정답 포맷이며, 017 의 "개행 변환" 은 오히려 포맷 위반.
 
 ## 로컬 산출물 (Zindi 미제출 포함)
 

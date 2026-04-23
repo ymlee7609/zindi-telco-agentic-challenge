@@ -3,15 +3,25 @@
 **생성일**: 2026-04-23
 **Baseline serial**: 016
 
-## 요약
+## 요약 (2026-04-23 수정)
 
 | 유형 | 개수 | baseline vs solver | Opus 판정 | 조치 |
 |---|---|---|---|---|
-| TOPO | 11 | 내용 일치, 포맷 차이(literal `\n`) | **포맷 수정 필요** | 017에서 수정 |
+| TOPO | 11 | 내용 일치, 포맷 동일 (literal `\n`은 Zindi 공식 포맷) | **수정 불필요** | 017 폐기 |
 | PATH | 15 | 완전 일치 | solver 신뢰 (Q11 증거 검증됨) | 유지 |
 | FAULT | 24 | 21개 일치, 3개 solver 실패 | 21개 신뢰, 3개 후속 검증 | 일부 후속 |
 
-총 조치: TOPO 11개 포맷 수정 → submission 017
+## 017 무효 사유
+
+`agent/common/submission_example.csv` 가 Zindi 공식 포맷 예시임을 확인. Track B multi-line 답변은 **literal `\n` (backslash + n)** 을 구분자로 사용하는 것이 정답 포맷. 017 의 "literal → 실제 개행" 변환은 포맷 위반이므로 제출 금지.
+
+## 실제 개선 기회
+
+0.44 baseline 에서 추가 점수 확보 가능 지점:
+1. **FAULT Q25, Q28, Q50** (solver conf=L, suspects=[]): 3개 모두 정답 교체 시 최대 +0.06
+2. **PATH Q34-Q38 (PJ area)**: 검증 미실시. 오답 있으면 해당 비중만큼 개선
+3. **FAULT 21개 중 solver 맞춤 답**: cross-check 필요. 정답률 자체에 여지 있음
+4. **scenario 전체 재검토**: 0.44 = 22/50 개 정답 = 28개는 실제 오답. solver == baseline 이라도 오답 가능.
 
 ## TOPO (11개) — 포맷 수정 대상
 
