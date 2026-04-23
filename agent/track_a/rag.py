@@ -2,18 +2,32 @@
 # -*- coding: utf-8 -*-
 """Track A RAG (Retrieval-Augmented Generation).
 
-각 scenario 를 14-dim 수치 특징 벡터로 변환하고, train 2000 의 사전 계산된 feature 를
+각 scenario 를 22-dim 수치 특징 벡터로 변환하고, train 2000 의 사전 계산된 feature 를
 이용해 가장 유사한 top-k scenario 를 검색. 검색된 scenario 와 그 정답을 dynamic
 few-shot 으로 agent 에 주입하면 패턴 인식이 강화된다.
 
-특징 (14-dim):
+특징 (22-dim, P2-1 확장):
+  # Throughput
   [0] TP min, [1] TP max, [2] TP avg, [3] TP drop ratio (max-min)/max
+  # SINR
   [4] SINR min, [5] SINR max, [6] SINR avg
+  # RSRP
   [7] RSRP min, [8] RSRP max, [9] RSRP avg
+  # Mobility
   [10] Unique serving PCI count (1=stable, >1=pingpong/handover)
   [11] Cell 수 (ncd rows)
+  # Parameters
   [12] Avg A3 Offset (over all cells, in 0.5dB units)
   [13] Max total downtilt (Mechanical + Digital)
+  # P2-1 확장 (+8 dim) — pattern-level discriminators
+  [14] SINR variance (P5 server issue vs P3 overshoot 구분)
+  [15] PCI transitions (consecutive PCI 변화 횟수, P2 ping-pong 강도)
+  [16] A3Offset variance across cells
+  [17] Tilt variance (max - min total downtilt across cells)
+  [18] Max cell power (P4 coverage hole: power < 30 여부 판단)
+  [19] Min cell power
+  [20] Throughput recovery flag (0=no recovery, 1=has recovery pattern)
+  [21] Dominant neighbor RSRP vs serving RSRP delta (P3 overshoot 지표)
 
 Usage (CLI):
     python rag.py --precompute        # train.json → .moai/cache/track_a_train_features.json
@@ -57,8 +71,46 @@ def _safe_int(v: Any, default: int = 0) -> int:
         return default
 
 
+def _variance(vals: list[float]) -> float:
+    """Simple population variance. 0 if less than 2 values."""
+    n = len(vals)
+    if n < 2:
+        return 0.0
+    m = sum(vals) / n
+    return sum((v - m) ** 2 for v in vals) / n
+
+
+def _pci_transitions(pcis: list[str]) -> int:
+    """Consecutive PCI 변화 횟수 (P2 ping-pong 강도)."""
+    if len(pcis) < 2:
+        return 0
+    return sum(1 for a, b in zip(pcis[:-1], pcis[1:]) if a != b and a and b)
+
+
+def _throughput_recovery_flag(tps: list[float]) -> float:
+    """TP 가 저점 → 회복 패턴을 보이면 1.0, 아니면 0.0.
+
+    Heuristic: TP 시퀀스에서 max → dip (≤ 50% of max) → recovery (≥ 80% of max) 패턴.
+    """
+    if len(tps) < 5:
+        return 0.0
+    mx = max(tps)
+    if mx <= 0:
+        return 0.0
+    low_threshold = mx * 0.5
+    high_threshold = mx * 0.8
+    state = 0  # 0=init, 1=saw_dip, 2=saw_recovery
+    for v in tps:
+        if state == 0 and v <= low_threshold:
+            state = 1
+        elif state == 1 and v >= high_threshold:
+            state = 2
+            break
+    return 1.0 if state == 2 else 0.0
+
+
 def extract_features(scenario: dict) -> list[float]:
-    """14-dim numeric feature vector for a scenario."""
+    """22-dim numeric feature vector for a scenario (P2-1 확장)."""
     data = scenario.get("data", {})
     upd = parse_pipe_csv(data.get("user_plane_data", ""))
     ncd = parse_pipe_csv(data.get("network_configuration_data", ""))
@@ -71,7 +123,7 @@ def extract_features(scenario: dict) -> list[float]:
     tps = [_safe_float(r.get(tp_col)) for r in upd if r.get(tp_col)]
     sinrs = [_safe_float(r.get(sinr_col)) for r in upd if r.get(sinr_col)]
     rsrps = [_safe_float(r.get(rsrp_col)) for r in upd if r.get(rsrp_col)]
-    pcis = [r.get(pci_col) for r in upd if r.get(pci_col)]
+    pcis = [r.get(pci_col) or "" for r in upd]
 
     tp_min = min(tps) if tps else 0.0
     tp_max = max(tps) if tps else 0.0
@@ -86,7 +138,7 @@ def extract_features(scenario: dict) -> list[float]:
     rsrp_max = max(rsrps) if rsrps else -60.0
     rsrp_avg = sum(rsrps) / len(rsrps) if rsrps else -90.0
 
-    unique_pci = len(set(pcis)) if pcis else 1
+    unique_pci = len(set(p for p in pcis if p)) if pcis else 1
     n_cells = len(ncd)
 
     a3_vals = [_safe_int(c.get("IntraFreqHoA3Offset [0.5dB]"), 6) for c in ncd]
@@ -98,13 +150,41 @@ def extract_features(scenario: dict) -> list[float]:
     ]
     max_tilt = max(total_tilts) if total_tilts else 0
 
+    # --- P2-1 확장 (+8 dim) ---
+    # [14] SINR variance
+    sinr_var = _variance(sinrs)
+    # [15] PCI transitions (consecutive changes)
+    pci_trans = _pci_transitions(pcis)
+    # [16] A3Offset variance across cells
+    a3_var = _variance([float(v) for v in a3_vals]) if a3_vals else 0.0
+    # [17] Tilt range (max - min)
+    tilt_range = float((max(total_tilts) - min(total_tilts))) if total_tilts else 0.0
+    # [18] Max cell power
+    powers = [_safe_int(c.get("Power")) for c in ncd]
+    max_power = float(max(powers)) if powers else 0.0
+    # [19] Min cell power
+    min_power = float(min(powers)) if powers else 0.0
+    # [20] Throughput recovery flag
+    tp_recovery = _throughput_recovery_flag(tps)
+    # [21] Dominant neighbor RSRP vs serving RSRP delta
+    # Approximation: if serving_rsrp_avg 와 neighbor rsrp 데이터 기반 비교 곤란 시 0
+    # 간단 proxy: rsrp_max (best snapshot) 가 avg 보다 크게 높으면 neighbor 경쟁 있음
+    serving_spread = rsrp_max - rsrp_avg
+
     return [
         tp_min, tp_max, tp_avg, tp_drop,
         sinr_min, sinr_max, sinr_avg,
         rsrp_min, rsrp_max, rsrp_avg,
         float(unique_pci), float(n_cells),
         avg_a3, float(max_tilt),
+        # P2-1 확장
+        sinr_var, float(pci_trans), a3_var, tilt_range,
+        max_power, min_power, tp_recovery, serving_spread,
     ]
+
+
+# 특징 벡터 차원 수 상수 (precompute/_compute_stats 에서 사용)
+FEATURE_DIM = 22
 
 
 # Z-score normalization params computed once from train set
@@ -114,7 +194,7 @@ _STATS_KEY = "_stats"
 def _compute_stats(all_features: list[list[float]]) -> dict:
     n = len(all_features)
     if n == 0:
-        return {"mean": [0.0] * 14, "std": [1.0] * 14}
+        return {"mean": [0.0] * FEATURE_DIM, "std": [1.0] * FEATURE_DIM}
     dim = len(all_features[0])
     means = [sum(f[i] for f in all_features) / n for i in range(dim)]
     stds = [
@@ -221,12 +301,58 @@ def retrieve_similar(scenario: dict, k: int = 3,
     ]
 
 
+def _feature_hint(scenario: dict) -> str:
+    """P2-3: 특징 벡터에서 pattern hint 를 간략 추출 (assistant few-shot 증강용).
+
+    50 토큰 이하의 짧은 힌트로 RAG neighbor 의 패턴 정답성을 설명. 예:
+      "ping-pong (PCI transitions=8), low A3 offset" → \\boxed{C16}
+    """
+    try:
+        f = extract_features(scenario)
+    except Exception:
+        return ""
+    # [0]tp_min [2]tp_avg [3]tp_drop [5]sinr_max [6]sinr_avg [7]rsrp_min [9]rsrp_avg
+    # [10]unique_pci [12]avg_a3 [13]max_tilt [14]sinr_var [15]pci_trans [18]max_power
+    sinr_avg = f[6]
+    rsrp_avg = f[9]
+    unique_pci = int(f[10])
+    avg_a3 = f[12]
+    max_tilt = int(f[13])
+    pci_trans = int(f[15])
+    max_power = int(f[18])
+    tp_recovery = f[20]
+
+    hints: list[str] = []
+    # P2 Ping-pong: multiple PCI transitions + low A3
+    if pci_trans >= 2 and avg_a3 <= 3:
+        hints.append(f"ping-pong (PCI trans={pci_trans}, low A3={avg_a3:.1f})")
+    # P1 Late handover: stable PCI + high A3
+    elif unique_pci == 1 and avg_a3 >= 8:
+        hints.append(f"late handover (stable PCI, high A3={avg_a3:.1f})")
+    # P3 Overshoot: low SINR + high power
+    elif sinr_avg <= 5 and max_power >= 25:
+        hints.append(f"possible overshoot (SINR={sinr_avg:.1f}, max_power={max_power})")
+    # P4 Coverage hole: very low RSRP + low power
+    elif rsrp_avg <= -100 and max_power < 30:
+        hints.append(f"coverage hole (RSRP={rsrp_avg:.1f}, max_power={max_power})")
+    # P5 Server issue: healthy SINR + tp recovery pattern
+    elif sinr_avg >= 10 and tp_recovery > 0:
+        hints.append(f"server-issue-like (SINR={sinr_avg:.1f} healthy, TP recovery)")
+    # P6 Excessive downtilt
+    elif max_tilt >= 20:
+        hints.append(f"excessive downtilt ({max_tilt} deg)")
+
+    return "; ".join(hints) if hints else ""
+
+
 def format_few_shot_from_retrieval(retrieved: list[dict]) -> list[dict]:
     """Convert top-k retrieved train entries into user/assistant few-shot messages.
 
     Each pair:
       user: very short "Similar drive-test scenario" header + task description + options
       assistant: minimal evidence + \\boxed{answer}
+
+    P2-3: assistant content 에 feature-based pattern hint 추가 (50토큰 이하).
     """
     with TRAIN_JSON.open(encoding="utf-8") as f:
         train = json.load(f)
@@ -245,9 +371,13 @@ def format_few_shot_from_retrieval(retrieved: list[dict]) -> list[dict]:
             f"{task.get('description', '')}\n"
             f"Options:\n{opts_block}"
         )
-        # Minimal assistant response (no multi-paragraph evidence — keep tokens tight)
+        # P2-3: pattern hint 주입 (간략 evidence)
         answer = r["answer"]
-        assistant_content = f"(Similar solved example) \\boxed{{{answer}}}"
+        hint = _feature_hint(s)
+        if hint:
+            assistant_content = f"(Similar pattern: {hint}) \\boxed{{{answer}}}"
+        else:
+            assistant_content = f"(Similar solved example) \\boxed{{{answer}}}"
         messages.append({"role": "user", "content": user_content})
         messages.append({"role": "assistant", "content": assistant_content})
     return messages

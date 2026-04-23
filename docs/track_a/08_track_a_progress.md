@@ -1,8 +1,9 @@
 # Track A 진행 경과 리포트
 
-> 최종 업데이트: 2026-04-22 (Stage C Smoke 실행 중)
+> 최종 업데이트: 2026-04-23 (Stage D — submission v2 생성 완료, self-consistency 실행 중)
 > 챌린지: Telco Troubleshooting Agentic Challenge — Track A (Wireless 5G Optimization)
 > Phase 1 기간: 2026-04-03 ~ 2026-05-04 (submission unlimited)
+> **최신 결과: submission_v1 (0.149) → submission_v2 (local IoU 0.317, test fallback 8.6%)**
 
 ---
 
@@ -109,15 +110,59 @@ Train eval 50 v3 에서 fallback 18/50 (36%) 이던 것이 test Batch A/B 에서
 - [x] **통합 submission** (Track A 500 + Track B 50) — `agent/common/submission/submission_combined.csv`
 - [x] docs 전 영역 반영 (00_index, 03-1/03-2/03-3, 04_rag_architecture, 08_progress)
 
-### 4.2 진행 예정 (Zindi 점수 확인 후)
+### 4.2 Stage D — v2 개선 완료 (2026-04-23)
 
-- [ ] Zindi 사이트 `submission_combined.csv` 업로드 → Public leaderboard 점수 확인
-- [ ] Challenge rule 재확인: Opus overlay 금지, Qwen 단독만 제출 가능
-- [ ] Batch 개선 실험 (택 1 또는 복수):
-  - **(A) Batch 직렬 재실행**: 병렬 latency 제거로 fallback 감소 검증 (비용 0)
-  - **(B) Feature 확장**: traffic_data / signaling_plane_data 를 14-dim → 20-dim+ 로 확장 (RAG 품질 향상)
-  - **(C) Self-consistency 선택 적용**: v1 에서 P7 fallback 된 343 scenario 만 n=3 재실행 (비용 1.5x)
-  - **(D) LoRA fine-tuning**: train 2000 으로 Qwen3.5-35B-A3B 파인튜닝 (Phase 3 대비, 가장 큰 개선)
+Zindi 점수 **0.149** (submission_v1) 확인 후 공격적 P0+P1+P2 개선을 수행.
+계획: `.moai/plans/track-a-0-149-track-shimmying-pascal.md`.
+
+**근본 원인 분석 (v1 eval_detail.jsonl):**
+- RC1: Multi-answer 예측 3/500 (실제 67/500) — 22× 부족
+- RC2: P7 fallback 343/500 (68.6%) vs 실제 P7 ~12.6% — 5-6× 과잉
+- RC3: max_iter(20) reached 275/500 (55%)
+- RC4: 병렬 실행에서 avg_iters 13-15 (vs 직렬 4.5)
+
+**구현 개선 (P0 + P1 + P2):**
+- [x] **P0-1** Multi-answer 강제 분기 + 재시도 (agent.py run())
+- [x] **P0-2** XML 오염 복구 `find_last_valid_boxed_answer()` (Track B 포팅 + scan_from_idx 버그 수정)
+- [x] **P0-3** `forced_answer_prompt(allow_p7=False)` 로 1차 forced 재시도 시 P7 억제
+- [x] **P1-1** XML 재질의 budget 분리 (iter 카운터 분리), max_iterations 25로 상향
+- [x] **P1-2** `--rerun-fallback` CLI 옵션 (fallback/unresolved 시나리오만 재실행)
+- [x] **P1-3** Multi-answer tag 전용 `build_system_prompt()` preamble
+- [x] **P2-1** RAG 14-dim → 22-dim 확장 (SINR variance, PCI transitions, A3 variance,
+      tilt range, power max/min, throughput recovery, serving RSRP spread)
+- [x] **P2-3** Few-shot assistant response에 feature-based pattern hint 주입
+
+**검증 결과 — Train eval 50 (v4, 동일 샘플):**
+| 지표 | v1 baseline | v3 RAG | **v4 (P0+P1+P2)** |
+|------|--------------|--------|-------------------|
+| Mean IoU | 0.160 | 0.220 | **0.3173** |
+| Exact match | - | 22% | **26%** |
+| fallback_used | - | 36% | **10%** |
+| max_iter reached | - | - | **4%** (max_iter=25) |
+| Multi 예측 | - | - | 14% |
+
+**Test batch v2 — 500 scenarios (병렬 2분할):**
+| 지표 | v1 | v2 |
+|------|----|----|
+| fallback_used | 343 (68.6%) | **43 (8.6%)** |
+| max_iter reached | 275 (55%) | **5 (1%)** |
+| unresolved | - | 5 (1.0%) |
+| Multi predictions | 3 (0.6%) | **62 (12.4%)** ← 실제 13.4% 에 근접 |
+| Single predictions | 497 | 438 |
+| 변경된 예측 vs v1 | - | 392/500 (78%) |
+| avg_iters | 13-15 | 5.2 |
+| avg_latency | 35s (병렬) | 75s (serial 2분할, 품질 우선) |
+
+**최종 제출본:**
+- `agent/track_a/submission/submission_v2.csv` — 550 rows, Track A 500 filled
+- `agent/common/submission/submission_combined.csv` — Track A v2 + Track B 50 병합
+- 기존 `submission_v1.csv`, `results_batch_a/`, `results_batch_b/` 보존
+
+**P2-2 Self-consistency (진행 중):**
+- 대상: fallback_used 또는 unresolved 43 시나리오 (Part A 23 + Part B 20)
+- `--rerun-fallback` + `--num-attempts 3` + `--temperature 0.5`
+- 결과 디렉토리: `results_batch_v2_a_sc/`, `results_batch_v2_b_sc/`
+- 완료 시 `submission_v2.csv` 에 overlay 머지 → `submission_v2_sc.csv`
 
 ---
 
@@ -152,8 +197,14 @@ agent/
     ├── results_pilot_v3/                # Pilot 50 (v3 RAG, test 0-49) ← submission 기반
     ├── results_batch_a/                 # Batch A 200 (v3 RAG, test 50-249)
     ├── results_batch_b/                 # Batch B 250 (v3 RAG, test 250-499)
+    ├── results_train_eval_50_v4/        # Train eval 50 (P0+P1+P2, IoU 0.317)
+    ├── results_batch_v2_a/              # Batch v2 part A (P0+P1+P2, test 0-249)
+    ├── results_batch_v2_b/              # Batch v2 part B (P0+P1+P2, test 250-499)
+    ├── results_batch_v2_a_sc/           # v2 fallback self-consistency Part A (n=3)
+    ├── results_batch_v2_b_sc/           # v2 fallback self-consistency Part B (n=3)
     └── submission/
-        └── submission_v1.csv            # Track A 최종 제출본 (v3 RAG)
+        ├── submission_v1.csv            # Track A v1 제출본 (v3 RAG) — Zindi 0.149
+        └── submission_v2.csv            # Track A v2 제출본 (P0+P1+P2) — 목표 ≥0.25
 
 docs/track_a/
 ├── 03-1_architecture.md                 # Agent 아키텍처 (Mermaid, Obsidian 호환)
@@ -164,20 +215,26 @@ docs/track_a/
 
 .moai/
 ├── cache/
-│   └── track_a_train_features.json      # RAG precompute (2000 entries, 14-dim + normalized)
+│   ├── track_a_train_features.json          # RAG precompute v2 (2000 entries, 22-dim)
+│   └── track_a_train_features.json.bak.14dim # 이전 14-dim 백업
 └── plans/
-    ├── track-a-opus-typed-glacier.md    # 전체 플랜
-    └── track-a-opus-solutions.md        # Stage A 수작업 풀이 + P1~P7 패턴 라이브러리
+    ├── track-a-opus-typed-glacier.md        # 전체 플랜
+    ├── track-a-opus-solutions.md            # Stage A 수작업 풀이 + P1~P7 패턴 라이브러리
+    └── track-a-0-149-track-shimmying-pascal.md  # v1 → v2 개선 계획 (목표 0.30)
 ```
 
 ## 6. 주요 수치 요약
 
-| 항목 | 값 |
-|------|-----|
-| Train eval 50 (v3 RAG) IoU | **0.220** (v1 baseline 0.160 대비 +38%) |
-| Train eval 50 (v3 RAG) exact | 11/50 (22%) |
-| Train eval 50 (v3 RAG) P7 fallback | 18/50 (36%) |
-| Test 500 scenarios 실행 | 500/500 완료 |
-| Test 500 P7 fallback | 343/500 (68.6%) — train 검증 대비 악화 |
-| Submission v1 평균 latency | 32.3s/scenario |
-| RAG cache 크기 | 1.1 MB (2000 entries × 14-dim + stats) |
+| 항목 | v1 (구) | v2 (현재) |
+|------|---------|----------|
+| Train eval 50 IoU | 0.220 (v3 RAG) | **0.3173** (+44% vs v3, +98% vs baseline) |
+| Train eval 50 exact match | 11/50 (22%) | **13/50 (26%)** |
+| Train eval 50 fallback | 18/50 (36%) | **5/50 (10%)** |
+| Test 500 fallback | 343/500 (68.6%) | **43/500 (8.6%)** |
+| Test 500 max_iter reached | 275/500 (55%) | **5/500 (1%)** |
+| Test 500 multi predictions | 3 (0.6%) | **62 (12.4%)** ≈ 실제 13.4% |
+| Test 500 unresolved | - | 5 (1.0%) |
+| Avg iters | 13-15 (parallel) | 5.2 (serial) |
+| Avg latency | 35s | 75s (직렬, 품질 우선) |
+| RAG cache 크기 | 1.1 MB (14-dim) | 1.54 MB (22-dim) |
+| Zindi public score | **0.149** | 목표 ≥ 0.25, 공격적 목표 0.30 |

@@ -47,7 +47,12 @@ from utils import extract_answer, extract_answer_all, compute_score  # noqa: E40
 
 # import prompts from the same package directory
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from prompts import SYSTEM_PROMPT, FEW_SHOT_EXAMPLES, forced_answer_prompt  # noqa: E402
+from prompts import (  # noqa: E402
+    SYSTEM_PROMPT,
+    FEW_SHOT_EXAMPLES,
+    forced_answer_prompt,
+    build_system_prompt,
+)
 from rag import retrieve_similar, format_few_shot_from_retrieval  # noqa: E402
 
 from openai import OpenAI, RateLimitError, APIConnectionError, APITimeoutError, APIError  # noqa: E402
@@ -178,6 +183,58 @@ class Environment:
 
 
 # ---------------------------------------------------------------------------
+# XML pollution detection + valid-answer recovery (포팅: Track B agent.py)
+# ---------------------------------------------------------------------------
+
+# Qwen 이 content 에 tool_call XML 을 직접 쓰는 경우 감지용 정규식.
+# 클라이언트는 native tool_calls protocol 만 실행하므로 XML 은 무시되어 iteration 이 낭비됨.
+_TOOL_CALL_XML_RE = re.compile(
+    r"<\s*tool_call\b|</\s*tool_call\s*>|<\s*function\s*=|<\s*parameter\s*=",
+    re.IGNORECASE,
+)
+
+
+def has_tool_call_xml(content: str) -> bool:
+    """content 에 tool_call XML 텍스트가 포함됐는지 감지 (Track B 포팅)."""
+    if not content:
+        return False
+    return bool(_TOOL_CALL_XML_RE.search(content))
+
+
+def find_last_valid_boxed_answer(messages: list[dict], scan_from_idx: int = 0) -> str:
+    """메시지 버퍼 [scan_from_idx:] 구간을 역순으로 스캔하여 유효한 \\boxed{...} 답을
+    포함한 마지막 assistant content 반환.
+
+    [HARD] RAG few-shot 및 static few-shot 의 assistant 메시지 (e.g. "(Similar solved
+    example) \\boxed{...}") 를 잘못 복구하지 않도록 scan_from_idx 이후만 확인.
+    scan_from_idx 는 보통 현재 시나리오의 user question message 인덱스+1.
+
+    조건:
+      - role == "assistant" and content 비어있지 않음
+      - XML 오염 없음 (has_tool_call_xml False)
+      - "\\boxed" 문자열 포함
+      - extract_answer() 가 성공 (non-empty)
+
+    실패 시 빈 문자열 반환. P0-2 XML recovery 용도.
+    """
+    if scan_from_idx < 0:
+        scan_from_idx = 0
+    window = messages[scan_from_idx:]
+    for m in reversed(window):
+        if m.get("role") != "assistant":
+            continue
+        content = (m.get("content") or "").strip()
+        if not content or has_tool_call_xml(content):
+            continue
+        if "\\boxed" not in content:
+            continue
+        ans = extract_answer(content) or ""
+        if ans.strip():
+            return content
+    return ""
+
+
+# ---------------------------------------------------------------------------
 # Runner
 # ---------------------------------------------------------------------------
 
@@ -256,7 +313,9 @@ class QwenRunner:
         if not tool_defs:
             return {"scenario_id": sid, "status": "unresolved", "reason": "No tools"}
 
-        messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
+        # P1-3: tag 에 따른 system prompt 선택 (single 기본 / multi 강조 preamble 추가)
+        tag_for_prompt = scenario.get("tag", "single-answer")
+        messages: list[dict] = [{"role": "system", "content": build_system_prompt(tag_for_prompt)}]
         # Static few-shot (P1/P3/P5 exemplars)
         messages.extend(FEW_SHOT_EXAMPLES)
         # Dynamic RAG few-shot: top-k similar train scenarios (same-tag filter)
@@ -272,17 +331,28 @@ class QwenRunner:
                 log.warning("RAG retrieval failed: %s", e)
                 rag_info = []
         messages.append({"role": "user", "content": question})
+        # P0-2: 현재 시나리오의 user question 이 append 된 직후 인덱스 기록 —
+        # XML recovery scan 은 이 인덱스 이후의 assistant 메시지만 대상으로 함.
+        # (static/RAG few-shot 의 "(Similar solved example)" 답변을 잘못 복구하는 버그 방지)
+        scenario_start_idx = len(messages)
 
         tool_calls_log: list[dict] = []
         num_tool_calls = 0
         status: str | None = None
         reason: str | None = None
         last_msg = None
-        i = 0
 
-        for i in range(self.max_iterations):
+        # P1-1: XML 재질의 budget 을 iteration counter 에서 분리.
+        #   iter_num 은 실제 tool_call 또는 최종 답 step 만 카운트.
+        #   XML 오염 재질의는 xml_retry_budget 으로 최대 5 회 허용 (iter 차감 X).
+        iter_num = 0
+        xml_retry_budget = 5
+        max_iter = self.max_iterations
+
+        while iter_num < max_iter:
             msg = self._call_model(messages, tools=tool_defs, temperature=temperature)
             if msg is None:
+                iter_num += 1
                 continue
             last_msg = msg
             messages.append({"role": "assistant", "content": msg.content or "", "tool_calls": msg.tool_calls})
@@ -294,20 +364,25 @@ class QwenRunner:
                     messages.append({"role": "tool", "content": result, "tool_call_id": tc.id})
                     tool_calls_log.append(
                         {
-                            "turn": i + 1,
+                            "turn": iter_num + 1,
                             "order": j + 1,
                             "function_name": tc.function.name,
                             "arguments": tc.function.arguments,
                             "has_failed": "error" in result,
                         }
                     )
+                iter_num += 1
             elif msg.content:
                 content = msg.content
-                # XML tool_call 오염 감지: Qwen 이 content 에 <tool_call>/<function=> 를 작성하는 경우
+                # XML tool_call 오염 감지
                 xml_polluted = ("<tool_call>" in content or "<function=" in content)
                 has_boxed = ("\\boxed" in content)
                 if xml_polluted and not has_boxed:
-                    # 오염 감지 → 재질의 (iteration 계속)
+                    if xml_retry_budget <= 0:
+                        log.warning("[%s] XML retry budget exhausted at iter %d", sid, iter_num)
+                        reason = "XML retry budget exhausted"
+                        break
+                    xml_retry_budget -= 1
                     messages.append({
                         "role": "user",
                         "content": (
@@ -320,31 +395,87 @@ class QwenRunner:
                             "Please retry now."
                         ),
                     })
+                    # P1-1: iter_num 증가시키지 않음 — XML 재질의는 별도 budget 으로 제한
                     continue
                 status = "solved"
                 break
             else:
+                iter_num += 1
                 status = "unresolved"
                 reason = "Empty response from model"
                 break
 
         if status is None:
             status = "unresolved"
-            reason = f"Max iterations ({self.max_iterations}) reached"
+            reason = f"Max iterations ({max_iter}) reached"
 
-        # free_mode forced answer if content is empty / missing \boxed{}
+        # 호환성: 결과 리포트의 num_iterations 에 사용할 i
+        i = iter_num - 1 if iter_num > 0 else 0
+
+        # P0 — Enhanced forced fallback: XML recovery → P7 suppression → multi-retry → P7 safety net.
         last_answer = getattr(last_msg, "content", "") if last_msg else ""
         last_traces = getattr(last_msg, "reasoning_content", "") if last_msg else ""
         extracted = extract_answer(last_answer) or extract_answer(last_traces)
+        tag = scenario.get("tag", "single-answer")
+
+        # P0-2: XML recovery — 현재 시나리오 user 메시지 이후 구간에서 유효한 \boxed 답을 복구
+        if not extracted:
+            recovered_content = find_last_valid_boxed_answer(messages, scan_from_idx=scenario_start_idx)
+            if recovered_content:
+                last_answer = recovered_content
+                extracted = extract_answer(last_answer) or ""
+                if extracted.strip():
+                    status = "recovered"
+                    log.info("[%s] XML recovery succeeded: %r", sid, extracted)
+
+        # P0-3: 1차 forced fallback — single-answer 에서 P7 옵션 선택 금지
         if not extracted and last_msg is not None:
-            tag = scenario.get("tag", "single-answer")
-            forced = forced_answer_prompt(tag, opts_block)
+            forced = forced_answer_prompt(tag, opts_block, allow_p7=False)
             messages.append({"role": "user", "content": forced})
             msg2 = self._call_model(messages, tools=None, temperature=temperature)
             if msg2 is not None:
                 last_msg = msg2
                 last_answer = getattr(msg2, "content", "") or ""
                 last_traces = getattr(msg2, "reasoning_content", "") or ""
+                extracted = extract_answer(last_answer) or extract_answer(last_traces)
+                if extracted:
+                    status = "solved"
+
+        # P0-1: Multi-answer retry — tag 가 multiple-answer 인데 단일 옵션만 반환된 경우
+        #       "2-4 개로 다시 제출하라" 로 최대 2 회 재시도.
+        if tag == "multiple-answer" and last_msg is not None:
+            for _ in range(2):
+                norm = normalize_answer(last_answer or last_traces)
+                if norm and "|" in norm:
+                    break
+                retry_prompt = (
+                    "Your last response was a SINGLE option, but this question is tagged "
+                    "'multiple-answer'. You MUST return 2-4 options separated by '|' in "
+                    "ASCENDING order. Example: \\boxed{C2|C8|C11} or \\boxed{C4|C9|C15|C20}. "
+                    "Review the evidence gathered and select 2-4 related options that address "
+                    "the same root cause or combined causes (e.g., P3 Overshoot: decrease power + "
+                    "press down tilt + increase A3 offset for the same cell; P4 Coverage hole: "
+                    "adjust azimuth + increase power + lift tilt for the same weak cell).\n"
+                    f"Options:\n{opts_block}"
+                )
+                messages.append({"role": "user", "content": retry_prompt})
+                msg3 = self._call_model(messages, tools=None, temperature=temperature)
+                if msg3 is None:
+                    break
+                last_msg = msg3
+                last_answer = getattr(msg3, "content", "") or ""
+                last_traces = getattr(msg3, "reasoning_content", "") or ""
+                status = "solved"
+
+        # Final safety net — 여전히 빈 답이면 P7 허용 (최후 수단)
+        if not (extract_answer(last_answer) or extract_answer(last_traces)) and last_msg is not None:
+            forced2 = forced_answer_prompt(tag, opts_block, allow_p7=True)
+            messages.append({"role": "user", "content": forced2})
+            msg4 = self._call_model(messages, tools=None, temperature=temperature)
+            if msg4 is not None:
+                last_msg = msg4
+                last_answer = getattr(msg4, "content", "") or ""
+                last_traces = getattr(msg4, "reasoning_content", "") or ""
                 status = "solved"
 
         final_content = last_answer or last_traces
@@ -504,7 +635,8 @@ def main() -> None:
                     choices=list(PROVIDERS.keys()))
     ap.add_argument("--model", default=None, help="Override provider default model")
     ap.add_argument("--max-tokens", type=int, default=8192)
-    ap.add_argument("--max-iterations", type=int, default=20)
+    ap.add_argument("--max-iterations", type=int, default=25,
+                    help="Real tool_call/answer iterations. XML retries are separate (budget=5).")
     ap.add_argument("--start-idx", type=int, default=0, help="Slice scenarios from this index")
     ap.add_argument("--max-samples", type=int, default=10)
     ap.add_argument("--save-dir", required=True, type=Path)
@@ -520,6 +652,11 @@ def main() -> None:
     ap.add_argument("--temperature", type=float, default=0.0,
                     help="Sampling temperature for attempts > 1 (default 0.0, but raised to 0.5 "
                          "when num-attempts > 1 for diversity)")
+    # P1-2 / P2-2: 기존 결과에서 fallback/unresolved 시나리오만 재실행
+    ap.add_argument("--rerun-fallback", type=Path, default=None,
+                    help="Path to existing eval_detail.jsonl; filter scenarios where "
+                         "fallback_used=True or status=unresolved and re-run only those. "
+                         "Used with --num-attempts 3 for self-consistency on hard cases.")
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
 
@@ -550,8 +687,35 @@ def main() -> None:
         scenarios = load_scenarios_from_json(args.source)
         log.info("Loaded %d scenarios from %s.json", len(scenarios), args.source)
 
+    # P1-2 / P2-2: --rerun-fallback 으로 지정된 eval_detail.jsonl 에서 fallback/unresolved 시나리오만 필터링
+    rerun_sids: set[str] | None = None
+    if args.rerun_fallback:
+        if not args.rerun_fallback.exists():
+            log.error("--rerun-fallback path does not exist: %s", args.rerun_fallback)
+            sys.exit(1)
+        rerun_sids = set()
+        with open(args.rerun_fallback, encoding="utf-8") as f:
+            for line in f:
+                try:
+                    d = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                sid = d.get("scenario_id")
+                if not sid:
+                    continue
+                is_fallback = bool(d.get("fallback_used"))
+                is_unresolved = d.get("status") == "unresolved"
+                is_empty_pred = not (d.get("prediction") or "").strip()
+                if is_fallback or is_unresolved or is_empty_pred:
+                    rerun_sids.add(sid)
+        log.info("--rerun-fallback: filtered %d scenarios from %s",
+                 len(rerun_sids), args.rerun_fallback)
+
     end_idx = min(args.start_idx + args.max_samples, len(scenarios))
     slice_ = scenarios[args.start_idx:end_idx]
+    if rerun_sids is not None:
+        slice_ = [s for s in slice_ if s.get("scenario_id") in rerun_sids]
+        log.info("After --rerun-fallback filter: %d scenarios to process", len(slice_))
     log.info("Processing [%d:%d] = %d scenarios", args.start_idx, end_idx, len(slice_))
 
     done: set[str] = set() if args.fresh else load_done(args.save_dir)

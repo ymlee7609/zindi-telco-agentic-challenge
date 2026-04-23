@@ -219,31 +219,82 @@ FEW_SHOT_EXAMPLES: list[dict[str, str]] = [
 ]
 
 
-def build_messages(question: str) -> list[dict]:
+# P1-3: Multi-answer 전용 강조 프롬프트 (base SYSTEM_PROMPT 뒤에 append).
+# single-answer 시에는 base 만 사용. 현재 submission_v1 의 3/500 multi 예측 문제 해결용.
+MULTI_ANSWER_EMPHASIS = """
+
+# CURRENT QUESTION IS MULTIPLE-ANSWER (STRICT)
+This specific question is tagged 'multiple-answer' — you MUST return 2-4 options.
+NEVER return a single option for this question. The task description itself says "two to four".
+
+Common multi-answer patterns to remember:
+- P3 Overshoot on cell X: combine `Decrease power for X` + `Press down tilt for X` + `Increase A3 offset for X` (+ optional `Adjust azimuth for X`)
+- P4 Coverage hole on weak cell X: combine `Adjust azimuth for X` + `Increase power for X` (+ optional `Lift tilt for X`)
+- Mixed P3 + P2: Overshoot on X + Ping-pong fix (Increase A3 offset) on a separate cell Y/Z
+- Mixed P3 + P6: Overshoot on cell A + excessive downtilt on cell B
+
+Output format: \\boxed{C2|C8|C11|C16} with IDs in ASCENDING order, 2-4 items.
+"""
+
+
+def build_system_prompt(tag: str) -> str:
+    """P1-3: tag 에 따른 system prompt 선택.
+
+    - single-answer: base SYSTEM_PROMPT (기존)
+    - multiple-answer: base + MULTI_ANSWER_EMPHASIS (multi 강조 preamble 추가)
+    """
+    if tag == "multiple-answer":
+        return SYSTEM_PROMPT + MULTI_ANSWER_EMPHASIS
+    return SYSTEM_PROMPT
+
+
+def build_messages(question: str, tag: str = "single-answer") -> list[dict]:
     """Assemble the full message list for a single scenario.
 
     Structure:
       [ system, <few-shot user/assistant pairs>, user (current question) ]
     """
-    messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    messages: list[dict] = [{"role": "system", "content": build_system_prompt(tag)}]
     messages.extend(FEW_SHOT_EXAMPLES)
     messages.append({"role": "user", "content": question})
     return messages
 
 
-def forced_answer_prompt(tag: str, options_block: str) -> str:
+def forced_answer_prompt(tag: str, options_block: str, allow_p7: bool = True) -> str:
     """Prompt used when the model failed to provide a \\boxed{} answer
-    after max_iterations. Port of main.py free_mode forced prompts."""
+    after max_iterations. Port of main.py free_mode forced prompts.
+
+    Args:
+        tag: "single-answer" 또는 "multiple-answer"
+        options_block: "C1:label\\nC2:label\\n..." 형식
+        allow_p7: False 이면 "Insufficient data" (P7) 옵션 선택을 명시적으로 금지
+                  (single-answer 시 1차 forced 재시도용). 최종 safety net 에서는 True 로 허용.
+    """
+    # P7 억제 문구 — single-answer 에서만 의미 있음 (multi 는 P7 이 정답일 수 없음)
+    p7_exclusion = ""
+    if not allow_p7 and tag == "single-answer":
+        p7_exclusion = (
+            "IMPORTANT: DO NOT pick the 'Insufficient data; more data is needed for judgment.' "
+            "option. Review the evidence gathered through your tool calls and pick the option "
+            "whose text most closely matches the observed pattern (late handover, ping-pong, "
+            "overshoot, coverage hole, server issue, excessive downtilt). If no pattern "
+            "dominates, pick the option most consistent with the measured RF/parameter values.\n"
+        )
     if tag == "single-answer":
         return (
             "This is a single-answer question. Select the most appropriate optimization "
             "solution and enclose its number in \\boxed{{}} in the final answer. "
             "For example, \\boxed{C3}.\n"
+            f"{p7_exclusion}"
             f"Potential root causes:\n{options_block}\n"
         )
     return (
         "This is a multiple-answer question. Select two to four possible optimization "
         "solutions and enclose their numbers in \\boxed{{}} in the final answer. "
         "For example, \\boxed{C3|C5} or \\boxed{C7|C11}. IDs in ASCENDING order.\n"
+        "IMPORTANT: Multiple-answer REQUIRES 2-4 options. NEVER return a single option. "
+        "Even if one root cause is dominant, list the related optimization actions that "
+        "address the same root cause (e.g., power + tilt + A3 offset for an overshooting "
+        "cell; power + azimuth + tilt for a coverage hole).\n"
         f"Potential root causes:\n{options_block}\n"
     )
