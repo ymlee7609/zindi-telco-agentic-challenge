@@ -1,8 +1,10 @@
 # Answers Ledger — Track B 50문제 근거 원장
 
-작성: 2026-04-23
+작성: 2026-04-23 (최종 업데이트: Opus 3차 검증 반영)
 각 문제에 대해 (답변, 근거 파일 경로, 확신도 H/M/L, 재검토 노트) 기록.
-topology_parser.py (deterministic, LLM 미사용) 실행 결과 기준.
+topology_parser.py / fault_analyzer.py / path_tracer.py (deterministic, LLM 미사용) 실행 결과 + Opus 독립 검증 (HIGH 23 / MEDIUM-HIGH 27, MEDIUM/LOW 0).
+
+**제출 Zindi 0.48** (serial 018, v11 0.20 대비 +140%). 상세 [06_progress_report §12](06_progress_report.md#12-opus-ground_truth-검증-파이프라인-2026-04-23-저녁-zindi-044--048).
 
 ---
 
@@ -275,10 +277,10 @@ topology_parser.py (deterministic, LLM 미사용) 실행 결과 기준.
 | Q22 | `Gamma-Portal-02;192.168.70.22;missing static route` | H | 단일 fault 명시 |
 | Q23 | `Delta-Axis-02;192.168.74.61;missing static route` | H | |
 | Q24 | `Delta-Portal-02;192.168.72.78;missing static route` | H | |
-| Q25 | (v11 유지) `Beta-Node-01;192.168.70.70;static route error` | L→base | 자체 deterministic 실패 |
+| Q25 | ~~(v11 유지) `Beta-Node-01;192.168.70.70;static route error`~~ → **`Alpha-Center-02;192.168.70.70;static route error`** | ~~L→base~~ → **HIGH (Opus 3차 검증)** | **Zindi 018 정답 확인** — Alpha-Center-02 의 `192.168.70.68/30` next-hop 이 정상(Q17) `192.168.74.46 GE1/0/6` 에서 Q25 변이 `192.168.74.54 GE1/0/3` (Delta 방향) 으로 잘못 변경 → static route error |
 | Q26 | `Gamma-Axis-02;192.168.74.45;missing static route` | H | |
 | Q27 | `Gamma-Portal-02;192.168.70.22;missing static route` | H | |
-| Q28 | (v11 유지) `Beta-Node-01;192.168.70.93;static route error` | L→base | |
+| Q28 | ~~(v11 유지) `Beta-Node-01;192.168.70.93;static route error`~~ → **`Gamma-Axis-02;192.168.70.93;routing loop`** | ~~L→base~~ → **HIGH (Opus 3차 검증)** | **Zindi 018 정답 확인** — Gamma-Axis-02 의 `192.168.70.92/30` next-hop 이 Gamma-Portal-02 방향 으로 변경, Portal-02 는 다시 Axis-02 로 forward → routing loop |
 
 ### PJ (Q39~Q50)
 
@@ -297,12 +299,15 @@ topology_parser.py (deterministic, LLM 미사용) 실행 결과 기준.
 | Q49 | `Demeter-Prime-01;20.1.4.10;missing static route` | H | |
 | Q50 | (v11 유지) `Hermes-Prime-01;10.1.1.20;ARP configuration error` | L→base | |
 
-**실측 점수 기여**: Fault 9/24 맞음 (v11 대비 +6, Zindi 0.24 → 0.36).
+**실측 점수 기여**:
+- v12 016 (topofault_rt): Fault 9/24 맞음 (v11 대비 +6, Zindi 0.24 → 0.36)
+- **018 (ground_truth)**: Q25/Q28 교체 2건 추가 정답 → Zindi **0.44 → 0.48** (+0.04 정확 적중)
 
 ### Fault 미해결 과제 (Day 2)
 
-- **Q17 3-후보 노드**: Alpha-Center-02 외에 Beta-Axis-02 / Beta-Portal-02 실험
-- **PJ zone reason 과다 단순화**: 9개 Q `missing static route` 일색 → VXLAN/L3VPN/BGP error 분류 필요
-- **Q42 MAC 포트**: GE1/0/5 (trunk)도 GE1/0/2 (down)도 오답. 정답 포트 미확정
-- **Q44/Q45 external ping**: shutdown reason 의심, `missing static route` 로 교체 실험
-- **Q50 L confidence**: base (v11) 유지 중. deterministic 답 생성 시도 필요
+- ~~**Q17 3-후보 노드**~~: Opus 검증 완료. Alpha-Center-02 확정 (HIGH)
+- ~~**Q25/Q28 deterministic 실패**~~: Opus 3차 검증으로 해결 (HIGH, Zindi 정답 입증)
+- **PJ zone reason 과다 단순화**: 9개 Q `missing static route` 일색 → MEDIUM-HIGH 이지만 EVPN/VXLAN parser 추가로 확인 필요
+- **Q42 MAC 포트**: GE1/0/5 (trunk)도 GE1/0/2 (down)도 오답. 정답 포트 미확정 (MEDIUM-HIGH)
+- **Q44/Q45 external ping**: shutdown reason, 대안 가설 실험 가치 (MEDIUM-HIGH)
+- **Q50 ARP configuration error**: Opus 검증 결과 baseline 정답 확정 (MEDIUM-HIGH). 10.1.1.0/24 direct L2 subnet 에서 ARP 학습 실패

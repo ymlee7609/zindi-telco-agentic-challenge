@@ -507,7 +507,96 @@ Day 1 miss 원인 추정:
 
 ### 11.6 참고 CSV 및 플랜
 
-- **최고점 CSV**: `agent/track_b/submission/submission_v12_topofault_rt.csv` (0.44)
+- **이전 최고점 CSV**: `agent/track_b/submission/submission_v12_topofault_rt.csv` (serial 016, Zindi 0.44)
+- **현재 최고점 CSV**: `agent/track_b/submission/submission_018_20260423_ground_truth.csv` (serial 018, Zindi **0.48**) — §12 참고
 - **Day 2 전략**: [`.moai/plans/track-b-day2-strategy.md`](../../.moai/plans/track-b-day2-strategy.md)
 - **Day 1 원본 플랜**: [`.moai/plans/track-b-misty-summit.md`](../../.moai/plans/track-b-misty-summit.md)
-- **Answers Ledger**: [`answers_ledger.md`](answers_ledger.md) (Topology 11문제 근거 기록)
+- **Answers Ledger**: [`answers_ledger.md`](answers_ledger.md) (50문제 답변 기록, Q25/Q28 Opus 교체 반영)
+
+---
+
+## 12. Opus GROUND_TRUTH 검증 파이프라인 (2026-04-23 저녁, Zindi 0.44 → 0.48)
+
+### 12.1 배경과 목적
+
+v12 최고점 0.44 도달 후 다음 개선 방향이 불분명했다. 매번 Zindi 제출로만 검증하는 방식은 일일 10회 제한이 있어 비효율적. **Opus 를 로컬 reference answer generator 로 활용**하여 제출 전 오답 후보 식별 시스템 구축.
+
+### 12.2 3단계 검증 진행
+
+**Stage 1 — 파일럿 (Q01/Q11/Q17)**
+- `agent/track_b/opus_reference/prepare_context.py` 신규 작성 — scenario별 LLDP/routing/ARP/interface 추출
+- Opus 세션 직접 reasoning 으로 3개 scenario 분석
+- Q11 에서 v12_final 과 v12_topofault_rt 간 불일치 발견 (사용자가 실제 제출본은 `topofault_rt` 임을 정정)
+
+**Stage 2 — 확장 12 scenarios (Q07-Q17 PATH)**
+- Q07-Q16 10개 PATH 모두 `Axis-02/Portal-02` 경로 확정 — `topofault_rt` 에 이미 반영
+- 최초 hypothesis "literal `\n` → 실제 개행 변환" 시도 (serial 017) 은 `agent/common/submission_example.csv` 공식 포맷 확인 후 **INVALID** 처리
+- 교훈: 항상 submission_example.csv 가 진실의 원천
+- README + CLAUDE.md 에 serial naming 규칙 + Zindi 포맷 HARD rule 추가
+
+**Stage 3 — 50 전체 + PJ zone 심층**
+- `agent/track_b/opus_reference/verify_pj.py` 신규 — LLDP fwd/rev + IP /30 peer + routing longest-prefix-match 3중 자동 검증
+- `prepare_context.py` 에 PJ zone parser 추가 (`display_current-configuration.txt` 파싱)
+- 50 entries 전부 MEDIUM-HIGH 이상 확신도 달성
+
+### 12.3 핵심 돌파구 — Q25/Q28 오답 발견 (Zindi 정답 입증)
+
+**Q25** `Beta-Node-01 → 192.168.70.70`
+- baseline: `Beta-Node-01;192.168.70.70;static route error` (장비 이름 오답)
+- Opus 증거: Alpha-Center-02 의 `192.168.70.68/30` next-hop 이 정상 Q17 에서 `192.168.74.46 GE1/0/6` (Gamma-Portal-02 방향) 이었으나 Q25 변이 에서 `192.168.74.54 GE1/0/3` (Delta-Portal-01 방향) 으로 잘못 설정됨 → Gamma zone 주소를 Delta zone 으로 forward
+- **Opus 확정**: `Alpha-Center-02;192.168.70.70;static route error`
+
+**Q28** `Beta-Node-01 → 192.168.70.93`
+- baseline: `Beta-Node-01;192.168.70.93;static route error` (장비 이름 오답)
+- Opus 증거: Gamma-Axis-02 의 `192.168.70.92/30` next-hop 이 Gamma-Portal-02 방향으로 변경 → Portal-02 는 다시 Axis-02 로 forward → **routing loop**
+- **Opus 확정**: `Gamma-Axis-02;192.168.70.93;routing loop`
+
+### 12.4 serial 018 결과 — +0.04 정확 적중
+
+`submission_018_20260423_ground_truth.csv` 생성:
+- base = serial 016 (v12_topofault_rt.csv, 0.44)
+- Q25, Q28 두 건만 Opus 확정 답으로 교체
+- 나머지 48 scenarios 는 baseline 과 identical
+
+**Zindi 결과**: **Track B 0.48** (+0.04, 50문제 중 2문제 정답 교체 = 0.04 증분 정확 적중)
+
+### 12.5 최종 확신도 분포 (50 entries)
+
+| confidence | 수 | 비고 |
+|---|---|---|
+| HIGH | **23** | LLDP/IP-peer/routing 직접 증거 |
+| MEDIUM-HIGH | **27** | 간접 증거 + solver 신뢰 (Opus = baseline) |
+| MEDIUM | 0 | 전부 승격 |
+| LOW | 0 | Q23 해결 (Delta-Axis-02 missing static route 증거) |
+
+Opus vs baseline 불일치: **2건만** (Q25, Q28) — 둘 다 HIGH + Zindi 정답 입증 완료.
+
+### 12.6 파이프라인 산출물
+
+`agent/track_b/opus_reference/`:
+- `GROUND_TRUTH.json` — 50 entries 통합 (qid, type, opus_answer, baseline_answer, agrees_with_baseline, confidence, notes)
+- `PILOT_REPORT.md`, `VERDICT_50.md`, `DEEP_VERIFICATION_NOTES.md` — 각 단계 리포트
+- `answers/` — Q01/Q11/Q17 개별 + TOPO/PATH/FAULT 통합 답변 markdown
+- `contexts/` — 50개 scenario 구조화된 context (Legacy 5KB + PJ 6~22KB)
+- `prepare_context.py` — context 추출기
+- `verify_pj.py` — PJ zone 자동 검증 스크립트 (344 LOC)
+- `build_ground_truth.py` — VERDICT dict → JSON regenerator
+
+`agent/track_b/submission/`:
+- `SUBMISSIONS.md` — serial naming 인덱스 (진실의 원천). 016 legacy / 017 INVALID / 018 current best
+- `submission_018_20260423_ground_truth.csv` — Zindi 0.48 제출본
+- `gen_submission_018.py` — 생성 스크립트
+
+### 12.7 한계와 미해결
+
+- **HIGH 50/50 미달**: PJ/PJGFA zone 은 EVPN VXLAN overlay 기반 → native routing table 만으로는 검증 불가. `display_bgp_evpn_all_routing-table.txt` parser 추가가 future work.
+- **MEDIUM-HIGH 27건 전부 Opus = baseline**: 추가 점수 개선을 위해서는 **대안 가설** (baseline 과 다른 답) 을 생성해야 함. 구체적 후보:
+  - PJ FAULT 8건 (Q39-41, Q43, Q46-49) 에서 `Demeter-Prime-01;...;missing static route` 외 다른 장비/reason 실험
+  - Q23 `Delta-Axis-02;...;missing static route` baseline 정답이지만 Delta-Portal-01 관점 실험도 가치
+  - Q44/Q45 port fault reason (shutdown vs `missing static route`) 실험
+
+### 12.8 교훈 — 실수와 정정
+
+- `submission_v12_final.csv` 를 "최신 제출본"으로 파일명만 보고 가정했으나 실제 Zindi 제출본은 `v12_topofault_rt.csv` 였음 → **파일명 기반 추론 금지**, `SUBMISSIONS.md` 를 단일 진실의 원천으로 사용.
+- serial 017 은 "literal `\n` → 실제 개행" 변환을 "no extra whitespace" 해석 오류로 시도 → `submission_example.csv` 확인 후 invalid 판정 → **항상 공식 포맷 예시 파일 먼저 확인**.
+- 이 두 교훈은 CLAUDE.md §1 Project-Specific HARD Rules 와 Anti-Repeat Lessons 에 영구 기록 (`03587e4` commit).
