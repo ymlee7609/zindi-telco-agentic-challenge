@@ -14,18 +14,18 @@
 
 ## 현황 요약
 
-- **최신 Zindi 제출본**: `submission_v12_topofault_rt.csv` (serial 016, 점수 0.44)
+- **현재 최고점**: **serial 018 = 0.48** (Track B 기준)
+- **이전 최고**: serial 016 = 0.44 (+0.04 상승 확인)
 - **017 상태**: **INVALID — 제출 금지**
-- **018 대기**: `submission_018_20260423_ground_truth.csv` (Opus GROUND_TRUTH 기반, Q25/Q28 2건 교체)
 - **다음 serial**: 019
 
 ## 제출 이력 (Zindi에 실제 제출된 것)
 
-| Serial | File | 제출일 | Zindi 점수 | 비고 |
+| Serial | File | 제출일 | Zindi (Track B) | 비고 |
 |---|---|---|---|---|
-| 018 | `submission_018_20260423_ground_truth.csv` | 미제출 | — | base=016, Q25/Q28 HIGH 확정 답 (Opus routing 증거). 최대 +0.04 기대 |
-| 017 | `submission_017_20260423_topo_newline_fix.csv` | — | **무효** | literal `\n` → 실제 개행 변환은 포맷 위반 |
-| 016 | `submission_v12_topofault_rt.csv` | 2026-04-23 | **0.44** | 현재 최고점 (베이스라인) |
+| **018** | `submission_018_20260423_ground_truth.csv` | 2026-04-23 | **0.48** ✅ | **현재 최고** — base=016, Q25/Q28 HIGH Opus 답 교체. 예상 +0.04 정확 적중. Q25 (Alpha-Center-02 static route error), Q28 (Gamma-Axis-02 routing loop) 모두 정답 확정 |
+| 017 | `submission_017_20260423_topo_newline_fix.csv` | — | **무효** | literal `\n` → 실제 개행 변환 시도 (포맷 위반). 제출 안 됨 |
+| 016 | `submission_v12_topofault_rt.csv` | 2026-04-23 | 0.44 | 이전 baseline, 018 개선 시작점 |
 | 이전 | (기록 없음 — 사용자 확인 후 추가 필요) | — | — | — |
 
 ## Zindi 공식 포맷 스펙 (중요)
