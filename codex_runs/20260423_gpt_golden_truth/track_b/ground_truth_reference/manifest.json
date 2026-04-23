@@ -1,0 +1,5 @@
+{
+  "source": "agent/track_b/opus_reference/GROUND_TRUTH.json",
+  "rows": 50,
+  "note": "Curated Track B ground truth reference from opus_reference/GROUND_TRUTH.json."
+}

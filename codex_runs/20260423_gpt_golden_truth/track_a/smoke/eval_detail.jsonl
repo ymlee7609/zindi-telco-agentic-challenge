@@ -1,0 +1,1 @@
+{"scenario_id": "08e221e5-3ed8-42ed-b7b3-0fd9dfd8d99e", "status": "unresolved", "reason": "No tools", "prediction": "C20", "fallback_used": true, "ground_truth": "C2|C8|C11|C16", "score": false, "num_iterations": null, "num_tool_calls": null, "latency_s": 0.0, "attempts": null, "raw_answer_head": "", "raw_traces_head": ""}

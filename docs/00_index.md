@@ -12,6 +12,7 @@
 ```
 docs/
 ├── 00_index.md                         # 본 인덱스 (전체 네비게이션)
+├── codex/                              # Codex 실행 기록 / 세션 문서
 ├── common/                             # 챌린지 전반 공통 자료
 ├── track_a/                            # Track A (Wireless 5G Optimization)
 └── track_b/                            # Track B (IP Network Troubleshooting)
@@ -28,6 +29,17 @@ docs/
 | 01 | [common/01_first_challenge_overview.md](common/01_first_challenge_overview.md) | 1차 AI Telco Troubleshooting Challenge (LLM 파인튜닝, 종료) | 종료 |
 | 02 | [common/02_agentic_challenge_overview.md](common/02_agentic_challenge_overview.md) | Agentic Challenge 공식 정보 (트랙/상금/규칙/타임라인) | 완료 |
 | 04 | [common/04_data_analysis.md](common/04_data_analysis.md) | Track A + Track B 데이터 구조 및 상세 분석 (submission_example 포함) | 완료 |
+
+---
+
+## Codex (docs/codex/)
+
+Codex 세션에서 생성한 실행 기록, 재현 로그, 별도 검증 문서.
+
+| 파일 | 설명 | 상태 |
+|---|---|---|
+| [codex/README.md](codex/README.md) | Codex 문서 디렉토리 안내 | 최신 |
+| [codex/2026-04-23_gpt_golden_truth_run.md](codex/2026-04-23_gpt_golden_truth_run.md) | GPT 시뮬레이션 기반 Track A/B 실행 결과 및 산출물 경로 | 최신 |
 
 ---
 

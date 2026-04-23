@@ -1,0 +1,5 @@
+{
+  "source": "data/Track A/data/Phase_1/train.json",
+  "rows": 2000,
+  "note": "Direct ground truth materialized from labeled Track A train split."
+}
