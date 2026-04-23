@@ -25,6 +25,19 @@ Core principles (1-4) and six Agent Core Behaviors (consolidated cross-cutting r
 - Direct tool usage permitted for simpler operations
 - Appropriate Agent Selection: Optimal agent matched to each task
 
+### Project-Specific HARD Rules (Zindi Telco Challenge)
+
+- [HARD] Zindi Submission Format Source of Truth: `agent/common/submission_example.csv` is the authoritative format spec. Read it BEFORE creating, modifying, or auditing any submission CSV. Do NOT infer format from problem text alone.
+- [HARD] Track B Multi-line Separator: Multi-line Track B answers (TOPO links, FAULT reasons, PATH candidates) MUST use literal `\n` (backslash + n, 2 chars) as the separator, NOT a real newline (U+000A). Zindi's scorer expects literal `\n`. Never convert `\n` → real newline under a "whitespace cleanup" pretext.
+- [HARD] "No extra whitespace" Clause Interpretation: The problem statement's "no extra whitespace characters before, after, or within each line" refers to whitespace WITHIN a single link/reason token. It does NOT condemn the `\n` separator. Do not re-litigate this.
+- [HARD] Submission Serial Naming: New submissions MUST use `submission_NNN_YYYYMMDD_label.csv` (3-digit monotonic serial). Read `agent/track_b/submission/SUBMISSIONS.md` BEFORE creating a new file to determine the next serial and the current Zindi-submitted baseline. Do not rely on filename heuristics or mtime.
+- [HARD] Baseline Confirmation: The current Zindi best submission is recorded in `SUBMISSIONS.md` (is_latest = Y). `submission_v12_final.csv` is NOT the Zindi baseline despite its name. Always consult the index.
+
+### Anti-Repeat Lessons (do not redo these mistakes)
+
+1. **2026-04-23 — Serial 017 format regression**: Created `submission_017_20260423_topo_newline_fix.csv` converting literal `\n` → real newlines under the wrong hypothesis. Submission marked INVALID. Do not propose this "fix" again — the literal `\n` IS the correct format.
+2. **Filename-based baseline guess**: `v12_final.csv` was assumed to be the Zindi-submitted baseline based on the "final" suffix; actual baseline was `v12_topofault_rt.csv` (0.44). Always confirm via `SUBMISSIONS.md`, not filenames.
+
 ---
 
 ## 2. Request Processing Pipeline

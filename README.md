@@ -171,6 +171,37 @@ python agent/common/submission/merge_submission.py --status
 
 Upload `agent/common/submission/submission_combined.csv` to Zindi.
 
+## Zindi Submission Format Spec (CRITICAL)
+
+**Source of truth**: `agent/common/submission_example.csv` — always consult this file before creating or modifying a submission.
+
+### Track B multi-line answers
+
+Multi-line Track B answers (TOPO multiple links, FAULT multiple reasons, PATH multiple candidates) use a **literal `\n` (two characters: backslash + n)** as the row separator — **not** an actual newline (U+000A).
+
+Correct (matches `submission_example.csv` line 507):
+```
+Atlas-Prime-01->Gaia-Node-01->Eon-Node-01\nAtlas-Prime-01\nGaia-Node-01->Demeter-Prime-01->Eon-Node-01
+```
+
+Incorrect — do NOT convert to real newlines:
+```
+Atlas-Prime-01->Gaia-Node-01->Eon-Node-01
+Atlas-Prime-01
+Gaia-Node-01->Demeter-Prime-01->Eon-Node-01
+```
+
+### Submission rules
+
+1. Before any submission work, read `agent/common/submission_example.csv` first. It is the authoritative format reference.
+2. Never "fix" literal `\n` to real newlines. Zindi's scorer expects literal `\n`.
+3. The "no extra whitespace before/after/within each line" clause in the problem statement refers to whitespace **within a single link/reason**, not the `\n` separator.
+4. Serial naming for new submissions: `submission_NNN_YYYYMMDD_label.csv`. See `agent/track_b/submission/SUBMISSIONS.md` for the serial registry.
+
+### History (why this matters)
+
+On 2026-04-23, serial 017 was created by converting literal `\n` → real newlines under the wrong hypothesis that `\n` counted as "extra whitespace". It does not. Serial 017 is marked INVALID. Current best submission remains serial 016 (`submission_v12_topofault_rt.csv`, Zindi 0.44).
+
 ## Project Structure
 
 ```
