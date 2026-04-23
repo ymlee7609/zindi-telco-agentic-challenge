@@ -199,30 +199,44 @@ per-tag:
 - 평균 latency 33.9s, iters 4.8, tool calls 8.7
 - `submission_pilot_v0.csv` 생성 → `agent/common/submission/submission_combined.csv` Track A 열 50/550
 
-### 5.6 개선 전략 (v4 까지 실행 + v5 계획)
+### 5.6 개선 전략 (v4 완료 → Zindi 0.3174 달성)
 
 | 버전 | 변경점 | 실측 효과 (train 50) |
 |------|--------|---------------------|
 | v1 | baseline (7-pattern system prompt + 5 static few-shot) | IoU 0.160, fb 22/50 |
 | v2 | XML 감지 재질의 + multi-answer 강제 규칙 | IoU 0.100 (regression) |
-| **v3** | **RAG 도입** — train 2000 에서 특징 벡터 (14-dim) 유사 top-3 검색 → dynamic few-shot 주입 | **IoU 0.220, fb 18/50** (+38%) |
-| v4 | v3 + Self-consistency n=3 + majority vote | train 10 IoU 0.425, fb **0/10** (비용 5x, 채택 X) |
-| v5 (계획) | fine-tuning (LoRA) on train 2000 | Phase 3 대비 |
+| v3 | RAG 도입 — 14-dim 특징 + train 2000 L2 retrieval | IoU 0.220, fb 18/50 (+38%) |
+| **v4 (현재)** | **P0 (XML recovery + multi retry + P7 억제) + P1 (XML budget 분리, max_iter 25) + P2 (RAG 22-dim + feature_hint + SC)** | **IoU 0.3173, fb 5/50** (+44% vs v3, +98% vs v1) |
+| v5 (후보) | LoRA fine-tuning on train 2000 | Phase 3 대비 |
 
-### 5.7 Stage C 최종 실행 (500/500 scenario 완료, 2026-04-23)
+### 5.7 Test 500 최종 실행 (submission_v1 → v2_sc 전환, 2026-04-23)
 
+**v1 (구, Zindi 0.149):**
 | Batch | 범위 | 실행 | 완료 | P7 fallback | Avg latency |
 |-------|------|------|------|-------------|-------------|
 | Pilot v3 | test 0-49 | 2026-04-22 | 50/50 | 22 (44%) | 27.4s |
-| Batch A | test 50-249 | 2026-04-23 | 200/200 | **134 (67%)** | 38.4s |
-| Batch B | test 250-499 | 2026-04-23 | 250/250 | **187 (75%)** | 31.2s |
-| **합계** | **test 0-499** | — | **500/500** | **343 (68.6%)** | **32.3s** |
+| Batch A | test 50-249 | 2026-04-23 | 200/200 | 134 (67%) | 38.4s |
+| Batch B | test 250-499 | 2026-04-23 | 250/250 | 187 (75%) | 31.2s |
+| **합계** | test 0-499 | — | 500/500 | **343 (68.6%)** | 32.3s |
 
-**이슈**: train 50 v3 에서 36% 이던 P7 fallback 이 test 500 에서 **68.6% 로 급증**.
-가설: (1) train-test 분포 차이, (2) Batch A/B 병렬 실행으로 OpenRouter latency 증가, (3) Qwen reasoning 폭주.
+**v2_sc (현재, Zindi 0.3174):**
+| Batch | 범위 | 실행 | 완료 | fallback_used | Avg latency |
+|-------|------|------|------|---------------|-------------|
+| Batch v2 A | test 0-249 | 2026-04-23 | 250/250 | - | 85s (serial) |
+| Batch v2 B | test 250-499 | 2026-04-23 | 250/250 | - | 57s (serial) |
+| v2 base 소계 | test 0-499 | — | 500/500 | **43 (8.6%)** | 75s |
+| SC overlay (n=3) | fallback 43건 | 2026-04-23 | 43/43 | **0 (0%)** | (추가 ~1.5h) |
+| **v2_sc 최종** | test 0-499 | — | 500/500 | **0 (0%)** | - |
 
-**제출물 생성**: `agent/track_a/submission/submission_v1.csv` (500 rows, RAG + P7 fallback)
-→ `agent/common/submission/submission_combined.csv` 의 Track A 500/550 자동 갱신.
+**Multi 예측 분포 변화:**
+- v1: 3/500 (0.6%) — 심각한 under-prediction
+- v2 base: 62/500 (12.4%)
+- **v2_sc: 67/500 (13.4%)** ← test.json 실제 multi=67 과 정확히 일치
+
+**제출물:**
+- v1: `agent/track_a/submission/submission_v1.csv` — 보존
+- **v2_sc: `agent/track_a/submission/submission_v2_sc.csv` (최종 제출본)**
+- 통합: `agent/common/submission/submission_combined.csv` 의 Track A 열이 v2_sc 로 갱신됨
 
 ---
 
@@ -238,18 +252,22 @@ per-tag:
 
 ---
 
-## 7. 다음 단계 (Stage C 후속)
+## 7. 다음 단계 (v2_sc 이후, Phase 1 데드라인 2026-05-04)
 
-Challenge 규칙 상 **Qwen 만 제출 가능** — Opus overlay 전략 폐기.
-Qwen 자체 정확도를 향상시키는 방법으로 전환:
+**완료된 개선 (v1 0.149 → v2_sc 0.3174):**
+1. ✅ P0 XML recovery + multi retry + P7 억제 → fallback 68% → 8.6%
+2. ✅ P1 XML budget 분리, max_iter 25, tag별 system prompt → max_iter 소진 55% → 1%
+3. ✅ P2 RAG 22-dim + feature_hint + self-consistency → IoU 0.317 (test 0.3174)
 
-1. **RAG v3 검증**: train 10 → train 50 → IoU 비교. 베이스라인 0.18 대비 유의미 향상 확인.
-2. **Self-consistency**: 동일 문제 n=3 trial → majority vote. 비용 3x.
-3. **Prompt 강화**: multi-answer 는 반드시 2 또는 4 (3은 없음), Qwen3 의 XML 선호 완화.
-4. **Pilot v3 재실행** (RAG 통합) → 500 전수 배치
-5. Phase 3 대비 **fine-tuning** (LoRA on train 2000, Qwen3.5-35B-A3B)
+**후속 실험 후보:**
+1. **RAG feature 추가** (22 → 30+ dim): traffic_data, signaling_plane_data, MR variance
+2. **Ensemble**: HuggingFace/DashScope provider 투표 (Qwen 인스턴스 3개)
+3. **LoRA fine-tuning**: train 2000 으로 Qwen3.5-35B-A3B 파인튜닝 (Phase 3 대비)
+4. **Embedding retrieval**: BAAI/bge-m3 로 scenario JSON → embedding 변환
+5. **Self-consistency 전역 적용**: 현재 fallback 43건에만 적용 → 전체 500건 n=3 (비용 3x)
 
 진행 리포트: `08_track_a_progress.md`
+개선 계획: `.moai/plans/track-a-0-149-track-shimmying-pascal.md`
 
 ---
 

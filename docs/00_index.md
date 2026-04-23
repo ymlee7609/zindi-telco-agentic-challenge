@@ -41,7 +41,7 @@ single / multiple answer.
 | 03-1 | [track_a/03-1_architecture.md](track_a/03-1_architecture.md) | Track A 에이전트 아키텍처 (Mermaid + provider/tool/prompt 흐름) | 완료 |
 | 03-2 | [track_a/03-2_topology.md](track_a/03-2_topology.md) | 무선 5G 네트워크 토폴로지 (gNodeB/PCI/RSRP/SINR/A3 handover) | 완료 |
 | 03-3 | [track_a/03-3_problems.md](track_a/03-3_problems.md) | Phase 1 문제 분석 + 7-pattern library (P1~P7) | 완료 |
-| 04 | [track_a/04_rag_architecture.md](track_a/04_rag_architecture.md) | RAG 동작 구조 (14-dim feature + retrieval + dynamic few-shot) | 신규 |
+| 04 | [track_a/04_rag_architecture.md](track_a/04_rag_architecture.md) | RAG 동작 구조 (22-dim feature + retrieval + feature_hint + SC overlay) | 22-dim 확장 |
 | 08 | [track_a/08_track_a_progress.md](track_a/08_track_a_progress.md) | Track A 진행 리포트 | 최신 |
 
 관련 자원 (repo 내):
@@ -136,20 +136,25 @@ Opus vs baseline 불일치 2건 (Q25 Alpha-Center-02 static route error, Q28 Gam
 - [ ] **Day 2 (2026-04-24)**: MEDIUM-HIGH 27건 중 PJ FAULT 재검토 (EVPN parser 추가) + 대안 가설 실험 → 목표 0.55+
 - [ ] Phase 2 대비 에이전트 최적화
 
-### Track A (Wireless 5G Optimization) — **Phase 1 submission v1 제출 단계 (2026-04-23)**
+### Track A (Wireless 5G Optimization) — **Phase 1 submission v2_sc 제출 완료 · Zindi 0.3174 (2026-04-23)**
 
 - [x] Challenge README 및 main.py/server.py 구조 파악
 - [x] train 2000 + test 500 scenario 스키마 확인 (inline data; test answer 는 `"To be determined"` placeholder)
 - [x] **Stage A — Opus 수작업 풀이 (train 10 + traces 2)** → 9/10 정답, P1~P7 패턴 라이브러리 도출 (`.moai/plans/track-a-opus-solutions.md`)
 - [x] **Stage B — `agent/track_a/` 디렉토리 구축** (`agent.py`, `prompts.py`, `rag.py`, `generate_submission.py`, `eval_local.py`, `tools/scenario_summary.py`)
-- [x] **RAG 도입**: train 2000 precompute 14-dim feature cache → L2 retrieval top-3 → dynamic few-shot (`docs/track_a/04_rag_architecture.md`)
-- [x] **Self-consistency (v4)**: `--num-attempts N` + majority vote 구현 (train 10 에서 fb 0 달성, 비용 5x 로 v3 채택)
-- [x] **Stage C — Qwen 500/500 실행 완료** (Pilot v3 50 + Batch A 200 + Batch B 250)
-  - 로컬 검증 (train 50 v3 RAG): **IoU 0.220** (v1 baseline 0.160 대비 +38%)
-  - 이슈: test Batch 에서 P7 fallback 68.6% 로 train 검증 36% 대비 급증
-- [x] **Submission v1 생성**: `agent/track_a/submission/submission_v1.csv` → `agent/common/submission/submission_combined.csv` (550/550)
-- [ ] **Zindi 업로드 → Public leaderboard 점수 확인**
-- [ ] 점수 기반 다음: (A) Batch 직렬 재실행 / (B) Feature 확장 / (C) v4 부분 적용 / (D) Phase 3 LoRA fine-tuning
+- [x] **RAG 도입 (v3)**: train 2000 precompute 14-dim feature cache → L2 retrieval top-3 → dynamic few-shot
+- [x] **Stage C — Qwen 500/500 실행 (v1 제출)** → **Zindi 0.149** (P7 fallback 68.6%, multi 예측 3/500)
+- [x] **Stage D — v2 공격적 개선 (2026-04-23)**
+  - [x] P0: XML 복구 (find_last_valid_boxed_answer) + multi retry + P7 억제 forced (allow_p7=False)
+  - [x] P1: XML retry budget 분리 / max_iter 25 / multi tag preamble / `--rerun-fallback` CLI
+  - [x] P2: RAG 14→22 dim 확장 + feature_hint + self-consistency (fallback 43건, n=3)
+  - [x] Train eval 50 v4 검증: **IoU 0.3173** (v1 baseline 0.160 대비 +98%, G3 gate 0.28 초과)
+  - [x] Test 500 batch v2 실행 (병렬 2분할 serial): fallback 43/500 (8.6%), multi 62/500
+  - [x] SC overlay on fallback 43 → `submission_v2_sc.csv` 생성 (multi 67/500 실제와 정확 일치, fallback 0)
+- [x] **Zindi public leaderboard 확인: 0.3174 (+113% vs v1)**
+  - 로컬 train IoU 0.3173 ≈ Zindi 0.3174 → 검증 방법론 거의 완벽 일치
+  - 공격적 목표 0.30 초과 달성
+- [ ] (선택) 추가 실험: RAG 30 dim 확장 / ensemble / LoRA fine-tuning (Phase 3)
 
 ---
 
@@ -160,9 +165,9 @@ Opus vs baseline 불일치 2건 (Q25 Alpha-Center-02 static route error, Q28 Gam
 | Provider | OpenRouter |
 | Model | `qwen/qwen3.5-35b-a3b` |
 | MAX_TOKENS | 8192 (Qwen3 reasoning 대응) |
-| MAX_ITERATIONS | 30 (Track B) / 20 (Track A) |
+| MAX_ITERATIONS | 30 (Track B) / **25 (Track A v4)** — XML retry budget 별도 5회 |
 | Track A 서버 | `localhost:7861` (test) + `localhost:7862` (train, DATA_SPLIT=train) |
-| Track A 출력 | `agent/track_a/results_*` (pilot_v3, batch_a, batch_b, train_eval_50_v3) |
+| Track A 출력 | `agent/track_a/results_batch_v2_{a,b}/`, `results_batch_v2_{a,b}_sc/`, `results_train_eval_50_v4/` |
 | Track B 서버 | `localhost:7860` |
 | Track B 출력 | `agent/track_b/results_v6_full/`, `results_v9_test/`, `results_v10_test/` |
 | Track B 최고점 제출본 | `agent/track_b/submission/submission_018_20260423_ground_truth.csv` (**Zindi 0.48**, serial 018, 2026-04-23 저녁) |
@@ -170,8 +175,9 @@ Opus vs baseline 불일치 2건 (Q25 Alpha-Center-02 static route error, Q28 Gam
 | Track B v11 baseline | `agent/track_b/submission/submission_v6_full_v11.csv` (Zindi 0.20) |
 | Track B submission 인덱스 | [`agent/track_b/submission/SUBMISSIONS.md`](../agent/track_b/submission/SUBMISSIONS.md) — serial 명명 규칙 + 진실의 원천 |
 | Track B Day 2 전략 | [`.moai/plans/track-b-day2-strategy.md`](../.moai/plans/track-b-day2-strategy.md) — 10회 제출 계획 |
-| Track A 최종 제출본 | `agent/track_a/submission/submission_v1.csv` (RAG v3, 500 scenarios, Zindi 0.3174) |
-| 통합 submission | `agent/common/submission/submission_combined.csv` (550 rows, Track A v2 + Track B 018, Zindi 제출 대상) |
+| **Track A 최종 제출본** | **`agent/track_a/submission/submission_v2_sc.csv`** (P0+P1+P2 + SC, 500 scenarios, **Zindi 0.3174**) |
+| Track A v1 제출본 (참조) | `agent/track_a/submission/submission_v1.csv` (Zindi 0.149) |
+| 통합 submission | `agent/common/submission/submission_combined.csv` (550 rows, Track A v2_sc + Track B 018, Zindi 제출 대상) |
 
 ## Zindi 제출 현황 (Track B)
 
@@ -190,3 +196,15 @@ Opus vs baseline 불일치 2건 (Q25 Alpha-Center-02 static route error, Q28 Gam
 핵심 돌파: Opus 3차 raw routing 검증이 baseline 의 장비 이름 오답 2건(Q25/Q28)을 찾아내 정답 교체 → Zindi 정답 입증.
 
 다음 Action (2026-04-24): MEDIUM-HIGH 27건 중 PJ FAULT 재검토 (EVPN/VXLAN parser 추가) + 대안 가설 실험. 상세 [`.moai/plans/track-b-day2-strategy.md`](../.moai/plans/track-b-day2-strategy.md).
+
+## Zindi 제출 현황 (Track A)
+
+| 날짜 | 제출 | 점수 | 개선 | 비고 |
+|---|---|---|---|---|
+| 2026-04-23 (초기) | `submission_v1.csv` (RAG v3 14-dim) | 0.149 | baseline | fallback 343/500 (68.6%), multi 3/500 |
+| 2026-04-23 (Stage D) | `submission_v2_sc.csv` (P0+P1+P2 + SC) | **0.3174** | **+113%** | fallback 0, multi 67/500 (실제와 정확 일치) |
+
+핵심 개선 전략: Track B 의 XML recovery + forced validation 패턴을 Track A 로 이식 + RAG 14→22 dim 확장 + self-consistency overlay.
+로컬 train eval IoU (0.3173) ≈ Zindi public (0.3174) → 검증 방법론 신뢰성 확보 (차이 0.0001).
+
+개선 계획 상세: [`.moai/plans/track-a-0-149-track-shimmying-pascal.md`](../.moai/plans/track-a-0-149-track-shimmying-pascal.md)
