@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
-"""Track A 7-pattern 대표 시나리오의 기지국 구성 2D top-view 시각화.
+"""Track A 7-pattern 대표 시나리오의 기지국 구성 2D top-view + UE 시계열 시각화.
 
-각 시나리오마다 다음을 포함한 PNG 한 장 생성:
-- cell 위치(실제 lon/lat → 지역 km offset)에 sector 부채꼴
-- Azimuth 방향, Tx power(반경), Total downtilt(색상)
-- PCI / A3Offset / 틸트 / 전력 주석
-- UE 시계열 경로 + throughput<100 Mbps 구간 빨간 점 강조
+각 시나리오마다 2-패널 PNG:
+- 왼쪽(top-view): cell lon/lat → km offset, sector 부채꼴(Azimuth/Tx power/tilt), UE drive path
+- 오른쪽(4단 시계열): Throughput, SS-RSRP, SS-SINR, Serving PCI (시간축)
 
 Output: docs/track_a/images/P{1-7}_{slug}_train{NNN}.png
 
@@ -17,11 +15,13 @@ from __future__ import annotations
 
 import json
 import math
+from datetime import datetime
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 from matplotlib.patches import Wedge
 
 # ---------------------------------------------------------------------------
@@ -34,7 +34,6 @@ OUT_DIR = REPO_ROOT / "docs" / "track_a" / "images"
 # ---------------------------------------------------------------------------
 # 7-pattern 대표 시나리오 매핑 (docs/track_a/03-3_problems.md §3 근거)
 # ---------------------------------------------------------------------------
-# tuple: (code, name, train_idx, trigger_description)
 PATTERNS: list[tuple[str, str, int, str]] = [
     ("P1", "Late Handover",        2,  "Serving PCI held + high A3Offset on serving cell -> handover delayed"),
     ("P2", "Ping-pong",             0,  "Serving PCI oscillates between two cells + both have low A3Offset"),
@@ -45,12 +44,20 @@ PATTERNS: list[tuple[str, str, int, str]] = [
     ("P7", "Insufficient Data",     6,  "All metrics within normal range -- no anomaly, no diagnosis"),
 ]
 
+# PCI 색상 테이블 (cell 순서대로 qualitative palette)
+PCI_PALETTE = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
+               "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]
+
+# 임계선
+TP_THRESHOLD_MBPS = 100.0
+RSRP_THRESHOLD_DBM = -100.0
+SINR_THRESHOLD_DB = 5.0
+
 
 # ---------------------------------------------------------------------------
-# 유틸
+# 파싱 유틸
 # ---------------------------------------------------------------------------
 def parse_pipe(text: str) -> list[dict[str, str]]:
-    """파이프 구분 문자열 테이블을 dict 리스트로 파싱."""
     lines = [ln.rstrip("\r") for ln in text.strip().split("\n") if ln.strip()]
     if not lines:
         return []
@@ -59,7 +66,6 @@ def parse_pipe(text: str) -> list[dict[str, str]]:
 
 
 def safe_float(s: str | None, default: float | None = None) -> float | None:
-    """공백/'-'/빈 문자열을 None 으로 처리하는 float 파싱."""
     if s is None:
         return default
     s = str(s).strip()
@@ -72,7 +78,6 @@ def safe_float(s: str | None, default: float | None = None) -> float | None:
 
 
 def to_km(lon: float, lat: float, lon0: float, lat0: float) -> tuple[float, float]:
-    """WGS84 lon/lat → 지역 equirectangular km offset (기준점 lon0/lat0)."""
     radius_km = 111.0
     x = (lon - lon0) * radius_km * math.cos(math.radians(lat0))
     y = (lat - lat0) * radius_km
@@ -83,48 +88,50 @@ def clamp(v: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, v))
 
 
+def parse_timestamp(s: str) -> datetime | None:
+    s = (s or "").strip()
+    for fmt in ("%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S"):
+        try:
+            return datetime.strptime(s, fmt)
+        except (ValueError, TypeError):
+            continue
+    return None
+
+
 # ---------------------------------------------------------------------------
-# 렌더링
+# Top-view 패널
 # ---------------------------------------------------------------------------
-def render_scenario(
+def render_topview(
     ax: Axes,
     cells: list[dict],
     ue_rows: list[dict],
-    code: str,
-    name: str,
-    idx: int,
-    description: str,
-    answer: str,
+    pci_color: dict[str, str],
 ) -> None:
-    """한 장의 axes 에 한 시나리오를 그린다."""
+    """왼쪽 top-view 패널: cell sector + UE drive path."""
 
-    # 기준점: 모든 cell + UE lat/lon 의 평균
+    # 기준점 계산
     all_lons, all_lats = [], []
     for c in cells:
-        lo = safe_float(c.get("Longitude"))
-        la = safe_float(c.get("Latitude"))
+        lo, la = safe_float(c.get("Longitude")), safe_float(c.get("Latitude"))
         if lo is not None and la is not None:
             all_lons.append(lo)
             all_lats.append(la)
     for r in ue_rows:
-        lo = safe_float(r.get("Longitude"))
-        la = safe_float(r.get("Latitude"))
+        lo, la = safe_float(r.get("Longitude")), safe_float(r.get("Latitude"))
         if lo is not None and la is not None:
             all_lons.append(lo)
             all_lats.append(la)
     if not all_lons:
-        raise ValueError(f"train[{idx}]: 유효한 lon/lat 없음")
+        raise ValueError("유효한 lon/lat 없음")
     lon0 = float(np.mean(all_lons))
     lat0 = float(np.mean(all_lats))
 
-    # sector 컬러맵: total tilt 0(green) → 25(red)
     tilt_cmap = plt.colormaps["RdYlGn_r"]
 
-    # ---- UE 경로 먼저 (sector 뒤에 깔림) ----
+    # UE 경로 먼저 깔기
     ue_xy: list[tuple[float, float, dict]] = []
     for r in ue_rows:
-        lo = safe_float(r.get("Longitude"))
-        la = safe_float(r.get("Latitude"))
+        lo, la = safe_float(r.get("Longitude")), safe_float(r.get("Latitude"))
         if lo is None or la is None:
             continue
         x, y = to_km(lo, la, lon0, lat0)
@@ -133,75 +140,73 @@ def render_scenario(
     if ue_xy:
         xs = [p[0] for p in ue_xy]
         ys = [p[1] for p in ue_xy]
-        ax.plot(xs, ys, color="steelblue", linewidth=1.6, alpha=0.55, zorder=2, label="UE drive path")
+        ax.plot(xs, ys, color="steelblue", linewidth=1.8, alpha=0.55, zorder=2)
 
-    # ---- sector 부채꼴 ----
+    # Sector 부채꼴 + 라벨 (라벨은 beam 뒤쪽에 배치하여 UE 경로와 겹침 회피)
     for c in cells:
-        lon = safe_float(c.get("Longitude"))
-        lat = safe_float(c.get("Latitude"))
+        lon, lat = safe_float(c.get("Longitude")), safe_float(c.get("Latitude"))
         if lon is None or lat is None:
             continue
-
         x, y = to_km(lon, lat, lon0, lat0)
         mech_az = safe_float(c.get("Mechanical Azimuth"), 0.0) or 0.0
         m_dt = safe_float(c.get("Mechanical Downtilt"), 0.0) or 0.0
         d_dt = safe_float(c.get("Digital Tilt"), 0.0) or 0.0
         total_tilt = m_dt + d_dt
         pwr = safe_float(c.get("Transmission Power"), 20.0) or 20.0
-        pci = c.get("PCI", "?")
+        pci = str(c.get("PCI", "?"))
         a3off_raw = safe_float(c.get("IntraFreqHoA3Offset [0.5dB]"))
-        a3off_db = (a3off_raw or 0) * 0.5  # 실효 dB
+        a3off_db = (a3off_raw or 0) * 0.5
         height = safe_float(c.get("Height"), 0.0) or 0.0
 
-        # geographic(N=0,E=90,시계) → matplotlib(E=0,N=90,반시계)
         math_center = (90.0 - mech_az) % 360.0
-        beamwidth = 65.0  # 일반 sector 안테나 가정
+        beamwidth = 65.0
         theta1 = math_center - beamwidth / 2.0
         theta2 = math_center + beamwidth / 2.0
 
-        # power (11~32 dBm) → radius (0.15 ~ 0.95 km) 선형 매핑
         radius = 0.18 + clamp((pwr - 10.0) / 22.0, 0.0, 1.0) * 0.7
-        color = tilt_cmap(clamp(total_tilt, 0.0, 25.0) / 25.0)
+        fill_color = tilt_cmap(clamp(total_tilt, 0.0, 25.0) / 25.0)
+        edge_color = pci_color.get(pci, "black")
 
         wedge = Wedge(
             (x, y), radius, theta1, theta2,
-            facecolor=color, edgecolor="black", linewidth=0.9, alpha=0.55, zorder=3,
+            facecolor=fill_color, edgecolor=edge_color, linewidth=1.8, alpha=0.55, zorder=3,
         )
         ax.add_patch(wedge)
-        # 안테나 위치 삼각형
-        ax.plot(x, y, marker="^", color="black", markersize=11, markeredgecolor="white",
+
+        # 안테나 삼각형 (PCI 색상으로 테두리)
+        ax.plot(x, y, marker="^", color=edge_color, markersize=12, markeredgecolor="black",
                 markeredgewidth=0.8, zorder=6)
 
-        # 라벨: 부채꼴 끝단 너머에 배치
-        tip_x = x + (radius + 0.10) * math.cos(math.radians(math_center))
-        tip_y = y + (radius + 0.10) * math.sin(math.radians(math_center))
+        # 라벨: beam 뒤쪽(안테나의 null 영역)에 배치
+        back_angle_rad = math.radians((math_center + 180.0) % 360.0)
+        label_dist = 0.18
+        lx = x + label_dist * math.cos(back_angle_rad)
+        ly = y + label_dist * math.sin(back_angle_rad)
 
         a3_text = f"A3Off={int(a3off_raw)}={a3off_db:.1f}dB" if a3off_raw is not None else "A3Off=?"
         label = (f"PCI {pci}\n"
-                 f"Az {int(mech_az)}°\n"
-                 f"M{int(m_dt)}°+D{int(d_dt)}° (tot={int(total_tilt)}°)\n"
-                 f"Pwr {int(pwr)} dBm · h {int(height)}m\n"
+                 f"Az {int(mech_az)}\u00b0\n"
+                 f"M{int(m_dt)}\u00b0+D{int(d_dt)}\u00b0 (tot={int(total_tilt)}\u00b0)\n"
+                 f"Pwr {int(pwr)} dBm \u00b7 h {int(height)}m\n"
                  f"{a3_text}")
 
         ax.annotate(
-            label, xy=(tip_x, tip_y),
+            label, xy=(lx, ly),
             fontsize=6.8, ha="center", va="center", zorder=7,
-            bbox=dict(boxstyle="round,pad=0.25", fc="white", ec="gray", alpha=0.9, linewidth=0.6),
+            bbox=dict(boxstyle="round,pad=0.25", fc="white", ec=edge_color,
+                      alpha=0.92, linewidth=1.0),
         )
 
-    # ---- UE 샘플 점 (throughput 저하 강조) ----
+    # UE 샘플 점: throughput 저하 강조
     if ue_xy:
-        low_count = 0
         for x, y, r in ue_xy:
             tp = safe_float(r.get("5G KPI PCell Layer2 MAC DL Throughput [Mbps]"))
-            if tp is not None and tp < 100:
-                low_count += 1
-                ax.plot(x, y, "o", color="crimson", markersize=8,
-                        markeredgecolor="black", markeredgewidth=0.6, zorder=8)
+            if tp is not None and tp < TP_THRESHOLD_MBPS:
+                ax.plot(x, y, "o", color="crimson", markersize=9,
+                        markeredgecolor="black", markeredgewidth=0.7, zorder=8)
             else:
-                ax.plot(x, y, "o", color="steelblue", markersize=4, zorder=5)
+                ax.plot(x, y, "o", color="steelblue", markersize=5, zorder=5)
 
-        # START / END 라벨
         ax.annotate(
             "START", xy=(ue_xy[0][0], ue_xy[0][1]),
             xytext=(10, 10), textcoords="offset points",
@@ -217,39 +222,170 @@ def render_scenario(
             zorder=10,
         )
 
-    # ---- 축/제목/캡션 ----
     ax.set_aspect("equal", adjustable="datalim")
     ax.grid(True, linestyle=":", alpha=0.45)
-    ax.set_xlabel("East–West offset (km)", fontsize=9)
-    ax.set_ylabel("North–South offset (km)", fontsize=9)
+    ax.set_xlabel("East-West offset (km)", fontsize=9)
+    ax.set_ylabel("North-South offset (km)", fontsize=9)
+    ax.set_title("Top-view (real lon/lat -> local km)", fontsize=10)
 
-    tag_label = "multiple-answer" if "|" in answer else "single-answer"
-    ax.set_title(
-        f"Track A  {code}  {name}   ——   train[{idx}]   answer={answer}  ({tag_label})",
-        fontsize=12, fontweight="bold", pad=10,
-    )
-
-    # 뷰포트 여유 확보
+    # 여백
     cur_xlim = ax.get_xlim()
     cur_ylim = ax.get_ylim()
-    pad_x = (cur_xlim[1] - cur_xlim[0]) * 0.08 + 0.15
-    pad_y = (cur_ylim[1] - cur_ylim[0]) * 0.08 + 0.15
+    pad_x = (cur_xlim[1] - cur_xlim[0]) * 0.10 + 0.20
+    pad_y = (cur_ylim[1] - cur_ylim[0]) * 0.10 + 0.20
     ax.set_xlim(cur_xlim[0] - pad_x, cur_xlim[1] + pad_x)
     ax.set_ylim(cur_ylim[0] - pad_y, cur_ylim[1] + pad_y)
 
-    # Caption box
+
+# ---------------------------------------------------------------------------
+# 시계열 패널
+# ---------------------------------------------------------------------------
+def render_timeseries(
+    ax_tp: Axes,
+    ax_rsrp: Axes,
+    ax_sinr: Axes,
+    ax_pci: Axes,
+    ue_rows: list[dict],
+    pci_color: dict[str, str],
+) -> None:
+    """오른쪽 4단 시계열: Throughput / RSRP / SINR / Serving PCI."""
+
+    # 데이터 추출
+    t0: datetime | None = None
+    times: list[float] = []
+    tps: list[float | None] = []
+    rsrps: list[float | None] = []
+    sinrs: list[float | None] = []
+    scis: list[str] = []
+
+    for r in ue_rows:
+        ts = parse_timestamp(r.get("Timestamp", ""))
+        if ts is None:
+            continue
+        if t0 is None:
+            t0 = ts
+        times.append((ts - t0).total_seconds())
+        tps.append(safe_float(r.get("5G KPI PCell Layer2 MAC DL Throughput [Mbps]")))
+        rsrps.append(safe_float(r.get("5G KPI PCell RF Serving SS-RSRP [dBm]")))
+        sinrs.append(safe_float(r.get("5G KPI PCell RF Serving SS-SINR [dB]")))
+        scis.append(str(r.get("5G KPI PCell RF Serving PCI", "?")).strip())
+
+    # --- Throughput ---
+    ax_tp.plot(times, [v if v is not None else np.nan for v in tps],
+               marker="o", color="steelblue", linewidth=1.3, markersize=4)
+    low_t = [t for t, v in zip(times, tps) if v is not None and v < TP_THRESHOLD_MBPS]
+    low_v = [v for v in tps if v is not None and v < TP_THRESHOLD_MBPS]
+    if low_t:
+        ax_tp.plot(low_t, low_v, "o", color="crimson", markersize=7, markeredgecolor="black",
+                   markeredgewidth=0.6, zorder=5)
+    ax_tp.axhline(TP_THRESHOLD_MBPS, color="crimson", linestyle="--", linewidth=0.8, alpha=0.6)
+    ax_tp.set_ylabel("Throughput\n(Mbps)", fontsize=8)
+    ax_tp.grid(True, linestyle=":", alpha=0.4)
+    ax_tp.tick_params(axis="both", labelsize=7)
+    ax_tp.set_title("UE time series", fontsize=10)
+
+    # --- RSRP ---
+    ax_rsrp.plot(times, [v if v is not None else np.nan for v in rsrps],
+                 marker="o", color="#2ca02c", linewidth=1.3, markersize=4)
+    ax_rsrp.axhline(RSRP_THRESHOLD_DBM, color="crimson", linestyle="--", linewidth=0.8, alpha=0.6)
+    ax_rsrp.set_ylabel("SS-RSRP\n(dBm)", fontsize=8)
+    ax_rsrp.grid(True, linestyle=":", alpha=0.4)
+    ax_rsrp.tick_params(axis="both", labelsize=7)
+
+    # --- SINR ---
+    ax_sinr.plot(times, [v if v is not None else np.nan for v in sinrs],
+                 marker="o", color="#9467bd", linewidth=1.3, markersize=4)
+    ax_sinr.axhline(SINR_THRESHOLD_DB, color="crimson", linestyle="--", linewidth=0.8, alpha=0.6)
+    ax_sinr.set_ylabel("SS-SINR\n(dB)", fontsize=8)
+    ax_sinr.grid(True, linestyle=":", alpha=0.4)
+    ax_sinr.tick_params(axis="both", labelsize=7)
+
+    # --- Serving PCI (categorical) ---
+    unique_pcis = sorted({p for p in scis if p and p != "?"}, key=lambda s: int(s) if s.isdigit() else 0)
+    pci_y = {p: i for i, p in enumerate(unique_pcis)}
+
+    for i, p in enumerate(scis):
+        if p not in pci_y:
+            continue
+        ax_pci.plot(times[i], pci_y[p], "o", color=pci_color.get(p, "#444"),
+                    markersize=8, markeredgecolor="black", markeredgewidth=0.5)
+
+    # 전환선 (handover 발생 지점)
+    for i in range(1, len(scis)):
+        if scis[i] and scis[i-1] and scis[i] != scis[i-1] and scis[i] in pci_y and scis[i-1] in pci_y:
+            ax_pci.plot([times[i-1], times[i]], [pci_y[scis[i-1]], pci_y[scis[i]]],
+                        color="gray", linewidth=0.8, alpha=0.6)
+
+    ax_pci.set_yticks(list(pci_y.values()))
+    ax_pci.set_yticklabels([f"PCI {p}" for p in pci_y.keys()], fontsize=7)
+    ax_pci.set_ylabel("Serving\nPCI", fontsize=8)
+    ax_pci.set_xlabel("Time (s from first sample)", fontsize=8)
+    ax_pci.grid(True, linestyle=":", alpha=0.4, axis="x")
+    ax_pci.tick_params(axis="x", labelsize=7)
+    if pci_y:
+        ax_pci.set_ylim(-0.5, len(pci_y) - 0.5)
+
+
+# ---------------------------------------------------------------------------
+# 시나리오 1개 렌더 (figure 단위)
+# ---------------------------------------------------------------------------
+def render_scenario_figure(
+    fig: Figure,
+    cells: list[dict],
+    ue_rows: list[dict],
+    code: str,
+    name: str,
+    idx: int,
+    description: str,
+    answer: str,
+) -> None:
+    # cell 순서대로 PCI → 색상 매핑
+    pci_color: dict[str, str] = {}
+    for i, c in enumerate(cells):
+        pci = str(c.get("PCI", "?"))
+        pci_color[pci] = PCI_PALETTE[i % len(PCI_PALETTE)]
+
+    # gridspec: 좌(top-view, 세로 풀) / 우(4단 시계열 stacked)
+    gs = fig.add_gridspec(
+        nrows=4, ncols=2,
+        width_ratios=[1.55, 1.0],
+        hspace=0.22, wspace=0.12,
+        left=0.06, right=0.975, top=0.90, bottom=0.13,
+    )
+    ax_top = fig.add_subplot(gs[:, 0])
+    ax_tp = fig.add_subplot(gs[0, 1])
+    ax_rsrp = fig.add_subplot(gs[1, 1], sharex=ax_tp)
+    ax_sinr = fig.add_subplot(gs[2, 1], sharex=ax_tp)
+    ax_pci = fig.add_subplot(gs[3, 1], sharex=ax_tp)
+
+    render_topview(ax_top, cells, ue_rows, pci_color)
+    render_timeseries(ax_tp, ax_rsrp, ax_sinr, ax_pci, ue_rows, pci_color)
+
+    # 첫 3단의 x-tick 라벨 숨기기
+    for a in (ax_tp, ax_rsrp, ax_sinr):
+        plt.setp(a.get_xticklabels(), visible=False)
+
+    # Figure-level 제목
+    tag_label = "multiple-answer" if "|" in answer else "single-answer"
+    fig.suptitle(
+        f"Track A  {code}  {name}   --   train[{idx}]   answer={answer}  ({tag_label})",
+        fontsize=13, fontweight="bold", y=0.97,
+    )
+
+    # 하단 캡션
     caption = (
         f"Pattern trigger: {description}\n"
-        f"Triangle = gNodeB antenna  |  Wedge = sector beam (65 deg beamwidth, direction = Mechanical Azimuth)\n"
-        f"Wedge radius proportional to Tx Power (11-32 dBm)  |  Color: green = low total tilt (wide cover), "
-        f"red = tilt >= 20 deg (narrow)\n"
-        f"Blue line/dots = UE drive path (~10 s window)  |  Red dots = UE samples with Throughput < 100 Mbps"
+        f"Triangle = gNodeB antenna  |  Wedge = sector beam (65 deg beamwidth, direction = Mechanical Azimuth)  |  "
+        f"Wedge radius proportional to Tx Power\n"
+        f"Wedge color: green = low total tilt (wide cover), red = tilt >= 20 deg (narrow)  |  "
+        f"Label placed behind antenna null-region  |  PCI sector color = PCI time-series color\n"
+        f"Red dashed lines: throughput<100 Mbps, RSRP<=-100 dBm, SINR<=5 dB  "
+        f"|  Red dots = UE samples below throughput threshold"
     )
-    ax.text(
-        0.5, -0.16, caption,
-        transform=ax.transAxes, ha="center", va="top",
-        fontsize=7.8, color="#333333", style="italic",
-        bbox=dict(boxstyle="round,pad=0.4", fc="#fafafa", ec="#cccccc", linewidth=0.6),
+    fig.text(
+        0.5, 0.025, caption,
+        ha="center", va="bottom", fontsize=7.6, color="#333", style="italic",
+        bbox=dict(boxstyle="round,pad=0.35", fc="#fafafa", ec="#cccccc", linewidth=0.6),
     )
 
 
@@ -258,20 +394,20 @@ def render_scenario(
 # ---------------------------------------------------------------------------
 def main() -> int:
     if not TRAIN_JSON.exists():
-        print(f"ERROR: {TRAIN_JSON} 가 없습니다")
+        print(f"ERROR: {TRAIN_JSON} not found")
         return 1
 
     print(f"Loading {TRAIN_JSON.name} ...")
     with TRAIN_JSON.open() as f:
         data = json.load(f)
-    print(f"  → {len(data)} scenarios")
+    print(f"  -> {len(data)} scenarios")
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     print(f"Output dir: {OUT_DIR.relative_to(REPO_ROOT)}")
 
     for code, name, idx, desc in PATTERNS:
         if idx >= len(data):
-            print(f"[skip] train[{idx}] 없음")
+            print(f"[skip] train[{idx}] missing")
             continue
 
         scenario = data[idx]
@@ -279,11 +415,9 @@ def main() -> int:
         ue_rows = parse_pipe(scenario["data"]["user_plane_data"])
         answer = scenario.get("answer", "?")
 
-        fig, ax = plt.subplots(figsize=(11, 8.5))
-        fig.subplots_adjust(bottom=0.18, top=0.92, left=0.08, right=0.96)
-
+        fig = plt.figure(figsize=(16.0, 9.5))
         try:
-            render_scenario(ax, cells, ue_rows, code, name, idx, desc, answer)
+            render_scenario_figure(fig, cells, ue_rows, code, name, idx, desc, answer)
         except Exception as e:  # noqa: BLE001
             print(f"[error] {code} train[{idx}]: {e}")
             plt.close(fig)
@@ -291,10 +425,10 @@ def main() -> int:
 
         slug = name.lower().replace(" ", "_")
         out_path = OUT_DIR / f"{code}_{slug}_train{idx:03d}.png"
-        fig.savefig(out_path, dpi=150, bbox_inches="tight")
+        fig.savefig(out_path, dpi=140, bbox_inches="tight")
         plt.close(fig)
         rel = out_path.relative_to(REPO_ROOT)
-        print(f"  ✓ {code} {name:<22} → {rel}  (cells={len(cells)}, ue={len(ue_rows)}, answer={answer})")
+        print(f"  OK  {code} {name:<22} -> {rel}  (cells={len(cells)}, ue={len(ue_rows)}, answer={answer})")
 
     print("Done.")
     return 0

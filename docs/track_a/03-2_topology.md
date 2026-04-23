@@ -154,6 +154,59 @@ graph TB
 
 ---
 
+## 5-bis. 7-pattern 실측 시각화 갤러리
+
+각 패턴(P1~P7)의 대표 train 시나리오를 실제 lon/lat 좌표 + sector beam 부채꼴 + UE 시계열(Throughput/RSRP/SINR/Serving PCI) 로 렌더한 이미지다. 부채꼴 **방향**은 Mechanical Azimuth, **반경**은 Tx Power 에 비례, **색상**은 Total Downtilt (green=wide cover, red=≥20° narrow). 라벨은 안테나 null 방향(beam 반대쪽)에 배치되어 UE 경로와 겹치지 않는다.
+
+재생성 스크립트: `agent/track_a/viz/render_pattern_topology.py`
+```bash
+python agent/track_a/viz/render_pattern_topology.py
+```
+
+### P1 Late Handover — train[2], answer=`C16`
+
+![P1 Late Handover](images/P1_late_handover_train002.png)
+
+서빙 셀의 A3Offset 이 과도하게 높아 UE 가 강한 neighbor 로 handover 못 하고 약해지는 서빙 셀에 머무르는 전형. Serving PCI 가 단일값으로 유지되며 throughput 만 저하하는 패턴.
+
+### P2 Ping-pong — train[0], answer=`C2|C8|C11|C16`
+
+![P2 Ping-pong](images/P2_ping-pong_train000.png)
+
+Serving PCI 시계열에서 **PCI 966 ↔ 166** 왕복이 눈으로 직접 확인된다. 양쪽 모두 `A3Off=2=1.0 dB` 로 과도하게 낮아 handover 임계값 근처에서 셀이 계속 바뀜. 3~7 초 구간 SINR < 5 dB 간섭으로 throughput 급락. 이 시나리오는 추가로 PCI 420 overshoot 요소도 포함되어 multiple-answer.
+
+### P3 Overshoot — train[10], answer=`C3|C12`
+
+![P3 Overshoot](images/P3_overshoot_train010.png)
+
+SINR 가 음수에 가까운 깊은 간섭 구간이 관찰된다. 원거리 high-power cell 의 빔이 UE 영역까지 overshoot 하여 serving 셀 신호와 충돌. 조치는 overshooting cell 의 **Power down + Tilt down + A3 Offset up** 3-tuple.
+
+### P4 Coverage Hole — train[17], answer=`C3|C14`
+
+![P4 Coverage Hole](images/P4_coverage_hole_train017.png)
+
+Serving RSRP 가 -100 dBm 근처까지 떨어지고, Top neighbor 들도 모두 약한 "전반 커버리지 부족" 패턴. Azimuth 조정 + Transmission Power 증가 조합으로 해소.
+
+### P5 Server Issue — train[1], answer=`C9`
+
+![P5 Server Issue](images/P5_server_issue_train001.png)
+
+RSRP/SINR 은 모두 양호 범위인데 throughput 만 불안정하게 변동. 무선 측 anomaly 가 없으므로 `Check test server and transmission issues` 가 유일한 정답.
+
+### P6 Excessive Downtilt — train[4], answer=`C3`
+
+![P6 Excessive Downtilt](images/P6_excessive_downtilt_train004.png)
+
+PCI 488 cell 의 `Mechanical 15° + Digital 9° = total 24°` 로 빔이 기지국 바로 아래만 커버(빨간 narrow 부채꼴). UE 영역을 커버해야 할 neighbor 가 커버를 못 하는 구조. **Lift tilt** 조치가 정답. Opus 도 초기에 P5 Server 로 오진할 정도로 까다로운 패턴.
+
+### P7 Insufficient Data — train[6], answer=`C9`
+
+![P7 Insufficient Data](images/P7_insufficient_data_train006.png)
+
+모든 지표가 정상 범위, serving PCI 안정, SINR ≥ 10, RSRP > -100, throughput 변동도 미미. 어떤 패턴도 매칭되지 않으므로 억지 진단 금지 — `Insufficient data; more data is needed for judgment.` 가 안전한 정답. 에이전트의 fallback 동작 근거가 되는 패턴.
+
+---
+
 ## 6. 정답 옵션 카테고리
 
 22개 안팎의 옵션 (C1~C22) 은 거의 모두 다음 카테고리 중 하나:
