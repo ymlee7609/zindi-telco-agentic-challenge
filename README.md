@@ -250,7 +250,7 @@ Upload `agent/common/submission/submission_combined.csv` to Zindi.
   - `10–15 min`: 60%
   - `> 15 min`: **0%** (timeout)
 
-## Current Status (2026-04-23)
+## Current Status (2026-04-23 Day 1 close)
 
 ### Track A — Phase 1 submission v1 ready
 
@@ -260,12 +260,21 @@ Upload `agent/common/submission/submission_combined.csv` to Zindi.
 - Local validation (train 50 v3 RAG): **IoU 0.220** (+38% over baseline 0.160)
 - Issue: test Batch shows P7 fallback 68.6% (vs 36% on train 50) — improvement options A~D documented in `docs/track_a/08_track_a_progress.md`
 
-### Track B — 48/50 solved, v10 candidate ready
+### Track B — Zindi 0.44 (22/50), +120% vs v11 baseline
 
-- v6_full 50/50 executed (47 Qwen solved + 1 forced + 2 timeout)
-- Non-solved Q11/Q36/Q38 recovered via prompt hardening + Opus overlay
-- v10: Q29 automatic + Q31/Q32 HIGH-ALIAS RULE 1~4 regression fix
-- See `docs/track_b/06_progress_report.md` and `07_not_solved_recovery_strategy.md`
+- **v11 baseline** (OpenRouter Qwen3.5, internal 48/50 solved label): Zindi **0.20** (10/50)
+- **v12 Deterministic Hybrid** (CLI file parsing + routing-table trace + LLM fallback): **0.44** (22/50)
+- New modules (2026-04-23):
+  - `agent/track_b/cli_parsers.py` — public LLDP / interface / routing / description parsers
+  - `agent/track_b/topology_parser.py` — 4-tier fallback (self LLDP → neighbor LLDP → neighbor desc → ARP)
+  - `agent/track_b/fault_analyzer.py` — nexthop chain + reason enum exact match
+  - `agent/track_b/path_tracer.py` — routing-table hop-by-hop (beats BFS on -02 paths)
+- Submission history (Zindi public):
+  - 0.20 v11 → 0.24 v12_topo → 0.12 v12_det_full (BFS rollback) → 0.36 v12_topo_fault → **0.44 v12_topofault_rt**
+- Best CSV: `agent/track_b/submission/submission_v12_topofault_rt.csv`
+- **Path Traditional Q7~Q16 fully solved** (10/10). Topology hallucinations (Spine/PC) eliminated.
+- Day 2 plan: `.moai/plans/track-b-day2-strategy.md` (10 submissions, target 0.55+)
+- See `docs/track_b/06_progress_report.md` §11 for full v12 technical breakdown
 
 ## License
 

@@ -1,7 +1,8 @@
 # Zindi Telco Agentic Challenge — 문서 인덱스
 
-> 최종 업데이트: 2026-04-23
+> 최종 업데이트: 2026-04-23 (Day 1 마감)
 > 문서 구조: **공통 / Track A / Track B** 3영역 분리
+> **Track B 최고점**: Zindi **0.44** (v11 baseline 0.20 대비 +120%)
 
 ---
 
@@ -61,7 +62,8 @@ IP 네트워크 토폴로지 / 경로 / 장애 트랙. Phase 1 50문제, Exact M
 | 03-3 | [track_b/03-3_problems.md](track_b/03-3_problems.md) | 50문제 유형별 분석 (Topology/Path/Fault) | 완료 |
 | 03-3-1 | [track_b/03-3-1_problems_detail.md](track_b/03-3-1_problems_detail.md) | 50문제 상황·과제·단서 상세 | 완료 |
 | 05 | [track_b/05_track_b_strategy.md](track_b/05_track_b_strategy.md) | Track B 전략 가이드 | 완료 |
-| 06 | [track_b/06_progress_report.md](track_b/06_progress_report.md) | Track B 진행 경과 리포트 (v1~v10) | 최신 (2026-04-23) |
+| 06 | [track_b/06_progress_report.md](track_b/06_progress_report.md) | Track B 진행 경과 리포트 (v1~v12, **Zindi 0.20→0.44**) | 최신 (2026-04-23 Day 1) |
+| - | [track_b/answers_ledger.md](track_b/answers_ledger.md) | Topology 11문제 근거 원장 (deterministic 답의 소스 파일) | 완료 |
 | 07 | [track_b/07_not_solved_recovery_strategy.md](track_b/07_not_solved_recovery_strategy.md) | Non-solved 3문제 해결 전략 (Q11, Q36, Q38 ultrathink + Opus overlay) | 완료 (2026-04-22) |
 | check | [track_b/check/INDEX.md](track_b/check/INDEX.md) | v8 매핑 정정 + TODO-01~15 검증 산출물 색인 | 최신 (2026-04-22) |
 | check | [track_b/check/TODO.md](track_b/check/TODO.md) | TODO-01~15 진행 현황 / 완료 상세 | 최신 (2026-04-22) |
@@ -100,6 +102,13 @@ IP 네트워크 토폴로지 / 경로 / 장애 트랙. Phase 1 50문제, Exact M
 - [x] **count_up_physical_ports (10G) suffix 버그 수정** + PJlAN-01/BorderLeaf2 alias 확증 (TODO-08/09)
 - [x] **submission_v6_full_v10.csv** (Q29 자동 정답 도출) — 최종 제출 후보 (v9 와 byte-identical)
 - [x] **HIGH-ALIAS prompt RULE 1~4 명문화** (Q31/Q32 회귀 원인 해소 패치, TODO-15)
+- [x] **v11 Fault reason matrix** + `validate_fault_answer` — 1차 제출 Zindi **0.20** (2026-04-23)
+- [x] **v12 Deterministic Hybrid** (2026-04-23) — cli_parsers / topology_parser / fault_analyzer / path_tracer 4종 신규 모듈
+  - v12_topo.csv → **Zindi 0.24** (+0.04, Topology 환각 제거)
+  - v12_det_full.csv → 0.12 (BFS Path 역효과, 롤백)
+  - v12_topo_fault.csv → **Zindi 0.36** (+0.16, Path=v11 유지)
+  - **v12_topofault_rt.csv** → **Zindi 0.44** (+0.08, Path routing-table trace, Traditional 10/10 완전 정복)
+- [ ] **Day 2 (2026-04-24)**: PJ Path overlay + Fault PJ reason 다변화 + Q17 3-후보 실험 → 목표 0.55+
 - [ ] Phase 2 대비 에이전트 최적화
 
 ### Track A (Wireless 5G Optimization) — **Phase 1 submission v1 제출 단계 (2026-04-23)**
@@ -131,12 +140,23 @@ IP 네트워크 토폴로지 / 경로 / 장애 트랙. Phase 1 50문제, Exact M
 | Track A 출력 | `agent/track_a/results_*` (pilot_v3, batch_a, batch_b, train_eval_50_v3) |
 | Track B 서버 | `localhost:7860` |
 | Track B 출력 | `agent/track_b/results_v6_full/`, `results_v9_test/`, `results_v10_test/` |
-| Track B 최종 제출본 | `agent/track_b/submission/submission_v6_full_v10.csv` (Zindi 업로드 대기) |
+| Track B 최고점 제출본 | `agent/track_b/submission/submission_v12_topofault_rt.csv` (**Zindi 0.44**, 2026-04-23) |
+| Track B v11 baseline | `agent/track_b/submission/submission_v6_full_v11.csv` (Zindi 0.20) |
+| Track B Day 2 전략 | [`.moai/plans/track-b-day2-strategy.md`](../.moai/plans/track-b-day2-strategy.md) — 10회 제출 계획 |
 | Track A 최종 제출본 | `agent/track_a/submission/submission_v1.csv` (RAG v3, 500 scenarios) |
 | 통합 submission | `agent/common/submission/submission_combined.csv` (550 rows, Zindi 제출 대상) |
 
-## Zindi 제출 절차
+## Zindi 제출 현황 (Track B)
 
-1. `agent/common/submission/submission_combined.csv` 확인 (550 rows, Track A 500 + Track B 50)
-2. Zindi 사이트 업로드 → Public leaderboard 점수 확인
-3. 점수 기반 Track A 개선 방향 결정 (Track B 는 v10 로 48/50 solved 로 baseline)
+| 날짜 | 제출 | 점수 | 누적 개선 |
+|---|---|---|---|
+| 2026-04-22 | v6_full_v8 (초기) | 0.18 | — |
+| 2026-04-23 09:25 | v6_full_v11 (Fault reason matrix) | **0.20** | +0.02 |
+| 2026-04-23 14:00 | v12_topo (Topology deterministic) | **0.24** | +0.04 |
+| 2026-04-23 14:30 | v12_det_full (BFS Path 역효과) | 0.12 | -0.12 |
+| 2026-04-23 15:00 | v12_topo_fault (Path=v11 복원) | **0.36** | +0.16 |
+| 2026-04-23 15:30 | **v12_topofault_rt (routing-trace)** | **0.44** | +0.08 |
+| 2026-04-23 17:00 | Q42 MAC fix 시도 | 0.44 | 0 |
+| **일일 사용** | **7회 / 10회 제한** | — | **+120% total** |
+
+다음 Action (2026-04-24): PJ Path overlay 재설계 + Fault PJ reason 다변화. 상세 [`.moai/plans/track-b-day2-strategy.md`](../.moai/plans/track-b-day2-strategy.md).
