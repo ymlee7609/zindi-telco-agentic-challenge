@@ -258,8 +258,8 @@
       "opus_answer": "Delta-Axis-02;192.168.74.61;missing static route",
       "baseline_answer": "Delta-Axis-02;192.168.74.61;missing static route",
       "agrees_with_baseline": true,
-      "confidence": "MEDIUM",
-      "notes": "Delta zone inter-zone fault"
+      "confidence": "LOW",
+      "notes": "raw 확인: Delta-Axis-02 routing 에 192.168.74.60/30 경로 존재(via 192.168.72.10 GE1/0/6) → baseline(Delta-Axis-02;...;missing static route) 와 모순. Delta-Portal-01 에는 경로 부재. 실제 fault 는 Delta-Portal-01 missing 가능성 있으나 완전 검증 미완. 제출 개선 후보."
     },
     {
       "qid": 24,
@@ -277,11 +277,11 @@
       "scenario_id": "acbae2eb-03e1-44ad-bc01-957e1d58dd3a",
       "type": "FAULT",
       "question_snippet": "The problem involves two major categories of faults: routing faults and port faults. Output format requirements: each line represents one fa...",
-      "opus_answer": "Alpha-Center-02;192.168.70.70;missing static route",
+      "opus_answer": "Alpha-Center-02;192.168.70.70;static route error",
       "baseline_answer": "Beta-Node-01;192.168.70.70;static route error",
       "agrees_with_baseline": false,
-      "confidence": "LOW",
-      "notes": "solver 실패 (conf=L), baseline(Beta-Node-01;...;static route error) 은 fallback heuristic. Opus 가설 HIGH 우선순위로 실험 가치"
+      "confidence": "HIGH",
+      "notes": "raw routing 검증 완료: Alpha-Center-02 의 192.168.70.68/30 next-hop 이 정상(Q17)에서 192.168.74.46 GE1/0/6 (Gamma-Portal-02) 이었으나 Q25 에서 192.168.74.54 GE1/0/3 (Delta-Portal-01) 로 잘못 변경됨. Gamma zone 주소를 Delta zone 으로 보냄 → static route error. baseline(Beta-Node-01;...;static route error) 은 장비 이름이 틀림."
     },
     {
       "qid": 26,
@@ -310,11 +310,11 @@
       "scenario_id": "25808901-5993-4dde-b09f-bccfd99a09b8",
       "type": "FAULT",
       "question_snippet": "The problem involves two major categories of faults: routing faults and port faults. Output format requirements: each line represents one fa...",
-      "opus_answer": "Alpha-Center-02;192.168.70.93;missing static route",
+      "opus_answer": "Gamma-Axis-02;192.168.70.93;routing loop",
       "baseline_answer": "Beta-Node-01;192.168.70.93;static route error",
       "agrees_with_baseline": false,
-      "confidence": "LOW",
-      "notes": "solver 실패, Q25 와 유사 가설. 실험 가치"
+      "confidence": "HIGH",
+      "notes": "raw routing 검증 완료: Gamma-Axis-02 의 192.168.70.92/30 next-hop 이 정상(Q17)에서 192.168.70.46 GE1/0/4 (Gamma-Node-04) 였으나 Q28 에서 192.168.70.14 GE1/0/6 (Gamma-Portal-02) 으로 변경됨. Gamma-Portal-02 는 다시 Gamma-Axis-02 로 forward → routing loop. baseline(Beta-Node-01;...;static route error) 오답."
     },
     {
       "qid": 29,
@@ -552,11 +552,11 @@
       "scenario_id": "463bbeb7-c99a-4d73-b066-87589503875e",
       "type": "FAULT",
       "question_snippet": "The question involves two major categories of faults: routing faults and port faults. Output format requirements: each line represents one f...",
-      "opus_answer": "Hermes-Prime-01;10.1.1.20;missing static route",
+      "opus_answer": "Hermes-Prime-01;10.1.1.20;ARP configuration error",
       "baseline_answer": "Hermes-Prime-01;10.1.1.20;ARP configuration error",
-      "agrees_with_baseline": false,
-      "confidence": "LOW",
-      "notes": "solver 실패, baseline(...;ARP configuration error) fallback. PJ zone context 부족"
+      "agrees_with_baseline": true,
+      "confidence": "MEDIUM-HIGH",
+      "notes": "raw 검증 완료: 10.1.1.0/24 는 Hermes-Prime-01/02 간 direct-connected subnet (Vlanif10). 10.1.1.10=Prime-01, 10.1.1.20=Prime-02. Hermes-Prime-01 ARP 에 10.1.1.20 entry 부재 → ARP 학습 실패. baseline(...;ARP configuration error) 유지. Opus 이전 가설(missing static route) 철회."
     }
   ]
 }
