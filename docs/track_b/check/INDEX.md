@@ -43,6 +43,7 @@
 | `TODO-08_pjlan_alias_audit.md` | 보고서 | Q32 GE1/0/3 의 PJlAN-01 = Eon-Node-01 alias 3중 교차 확증 |
 | `TODO-09_description_truncation_audit.md` | 보고서 | Q32 GE1/0/2 "to" 오인 정정 + `count_up_physical_ports` (10G) suffix 버그 수정 |
 | `TODO-14_v10_rerun_audit.md` | 보고서 | TODO-11/12/13/09 4중 패치 후 v10 재실행 — Q29 3/3 자동 정답 도출 (v9 fail 해결), Q31/Q32 회귀 발견 → best-of merge |
+| `TODO-16_v11_fault_audit.md` | 보고서 | FAULT prompt 재작성 + validate_fault_answer + Fault 24문제 v11 재실행 (Zindi 0.18 점수 대응) |
 
 코드 변경 (별도 보고서 없음, TODO.md §1 의 진행 결과 + commit 메시지 참조):
 
@@ -80,5 +81,7 @@
 - TODO-11/12/13 (forced validation + XML fallback + HIGH-ALIAS prompt): **완료**
 - TODO-14 (v10 재실행 + best-of merge): **완료** — Q29 자동 정답 도출, Q31/Q32 회귀 발견
 - TODO-15 (HIGH-ALIAS RULE 1~4 명문화): **완료** — Q31/Q32 회귀 원인 해소 예정
-- v10 제출본 생성: `agent/track_b/submission/submission_v6_full_v10.csv` (v9 와 byte-identical, Q29 자동 출처)
-- **TODO-10 (Zindi 제출): 사용자 결정 대기** ← 남은 유일한 TODO
+- v10 제출본 생성: `agent/track_b/submission/submission_v6_full_v10.csv` (v9 와 byte-identical, Q29 자동 출처) → Zindi 0.18
+- **TODO-16 (FAULT prompt 개선 + v11 재실행)**: **완료** — reason 3→6종 diversity, Q25/Q42 dump 제거, Q21 v10 유지
+- v11 제출본 생성: `agent/track_b/submission/submission_v6_full_v11.csv` (Fault 23/24 override)
+- **TODO-10 (v11 Zindi 제출): 사용자 결정 대기** ← 남은 유일한 TODO

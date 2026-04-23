@@ -20,9 +20,10 @@
 | TODO-13 | alias 다발 노드 escalation (패치 5-C, P2) | Low | **완료** | (이 커밋) | `agent/track_b/agent.py:801-845, build_type_hint` |
 | TODO-08 | Eon-Node-01 / PJlAN-01 alias 매핑 확인 (Q32 GE1/0/3) | Low | **완료** | (이 커밋) | `TODO-08_pjlan_alias_audit.md` |
 | TODO-09 | description 잘림 케이스 처리 + `count_up_physical_ports` (10G) suffix 버그 | Low→High | **완료** | (이 커밋) | `TODO-09_description_truncation_audit.md`, `agent.py:420-438` |
-| TODO-14 | TODO-11/12/13 패치 후 Q29~Q33 재실행 + v10 제출본 | Medium | **완료** | (이 커밋) | `TODO-14_v10_rerun_audit.md`, `submission_v6_full_v10.csv` |
-| TODO-15 | HIGH-ALIAS prompt 조정 (Q31/Q32 회귀 방지) | High | **완료** | (이 커밋) | `agent/track_b/agent.py:538-569` — RULE 1~4 명문화 |
-| TODO-10 | v10 제출본 Zindi 업로드 | Medium | 대기 (사용자 결정) | — | `submission_v6_full_v10.csv` (v9 와 byte-identical, Q29 자동 도출 기준) |
+| TODO-14 | TODO-11/12/13 패치 후 Q29~Q33 재실행 + v10 제출본 | Medium | **완료** | `44898c3` | `TODO-14_v10_rerun_audit.md`, `submission_v6_full_v10.csv` |
+| TODO-15 | HIGH-ALIAS prompt 조정 (Q31/Q32 회귀 방지) | High | **완료** | `44898c3` | `agent/track_b/agent.py:538-569` — RULE 1~4 명문화 |
+| TODO-16 | FAULT prompt + validate_fault_answer + v11 Fault 재실행 | High | **완료** | (이 커밋) | `TODO-16_v11_fault_audit.md`, `submission_v6_full_v11.csv` |
+| TODO-10 | v11 제출본 Zindi 업로드 | Medium | 대기 (사용자 결정) | — | `submission_v6_full_v11.csv` (Fault 23/24 reason diversity + dump 제거, Q21 만 v10 유지) |
 
 ---
 

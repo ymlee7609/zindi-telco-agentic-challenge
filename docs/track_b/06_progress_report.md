@@ -119,6 +119,31 @@
 
 ---
 
+## 5.0 v10 Zindi 실측 점수 (2026-04-23)
+
+Zindi Phase 1 public leaderboard 기준 **Track B = 0.18** (Track A = 0.149). 내부 47/50 solved 대비 큰 괴리. 원인 분석 (plan 문서 `.moai/plans/track-a-0-149-track-zazzy-llama.md`):
+- Fault 24문제 답의 reason 이 **3종**만 사용 (missing static / static route error / shutdown) — 13+7=20 enumerated 중 극소수
+- Multi-fault scenario 에서 1-line 답 다수 (under-diagnosis)
+- Q25, Q42 는 반대로 30~36 라인 shutdown 덤프 (over-answering)
+
+→ TODO-16 으로 FAULT prompt + validator 재작성 후 v11 재실행.
+
+## 5.0.1 v11 Fault 재실행 결과 (TODO-16)
+
+| 항목 | 값 |
+|---|---|
+| 실행 범위 | Fault 24문제 (Q17~Q28 Traditional + Q39~Q50 PJ) |
+| 결과 | 19 solved / 5 forced_answer / 0 timeout |
+| 소요 | 23.4 분 |
+| Reason diversity | v10 3종 → v11 6종 (ARP, interface IP, MAC 추가) |
+| 덤프 제거 | Q25 (36→1), Q42 (30→1) 라인 |
+| 악화 | Q21 (1→36) → v10 유지 선택 |
+| 최종 제출본 | `submission_v6_full_v11.csv` (Q21 제외 23/24 override) |
+
+상세: `docs/track_b/check/TODO-16_v11_fault_audit.md`
+
+---
+
 ## 5.1 v8 → v9 → v10 PJ Topology 재실행 결과 (Q29~Q33)
 
 | Q | target | alias% | v8 (기존) | v9 (TODO-03/05 패치) | v10 (TODO-11/12/13/15 패치) | 최종 채택 |
@@ -149,7 +174,8 @@
 | TODO-13 | description alias 비율 기반 HIGH-ALIAS prompt | 완료 |
 | TODO-14 | TODO-11/12/13 패치 후 Q29~Q33 재실행 + v10 | 완료 |
 | TODO-15 | HIGH-ALIAS RULE 1~4 명문화 (Q31/Q32 회귀 방지 패치) | 완료 |
-| TODO-10 | v10 제출본 Zindi 업로드 | **대기 (사용자 결정)** |
+| TODO-16 | FAULT prompt reason matrix + `validate_fault_answer` + v11 Fault 재실행 | 완료 |
+| TODO-10 | v11 제출본 Zindi 업로드 (Fault 23/24 개선본) | **대기 (사용자 결정)** |
 
 상세: `docs/track_b/check/INDEX.md`, `docs/track_b/check/TODO.md`, `docs/track_b/check/TODO-*_audit.md`
 

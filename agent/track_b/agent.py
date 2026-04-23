@@ -438,6 +438,104 @@ def count_up_physical_ports(question_id: int, target: str) -> int:
     return count
 
 
+# @MX:NOTE: [AUTO] TODO-16 — Fault 답 포맷·reason 문자열 엄격 검증
+_ROUTING_FAULT_REASONS: frozenset[str] = frozenset({
+    "blackhole route",
+    "missing static route",
+    "static route error",
+    "ARP configuration error",
+    "routing loop",
+    "BGP configuration error",
+    "OSPF configuration error",
+    "loopback IP configuration conflict",
+    "VXLAN configuration error",
+    "L3VPN configuration error",
+    "L2VPN configuration error",
+    "IS-IS configuration error",
+    "SRV6-Policy tunnel planning error",
+})
+_PORT_FAULT_REASONS: frozenset[str] = frozenset({
+    "shutdown",
+    "interface IP error",
+    "traffic congestion on port bandwidth",
+    "MAC address configuration error",
+    "VPN configuration missing",
+    "OSPF configuration error",
+    "MTU value configuration error",
+})
+_ALL_FAULT_REASONS: frozenset[str] = _ROUTING_FAULT_REASONS | _PORT_FAULT_REASONS
+
+# 포트 토큰: GE1/0/1, GigabitEthernet0/0/1, Eth-Trunk1, Eth-Trunk3.2, XGE1/0/1 등
+_PORT_TOKEN_RE = re.compile(
+    r"^("
+    r"(?:GE|XGE|10GE|25GE|40GE|100GE|GigabitEthernet|XGigabitEthernet|Ethernet)\d+/\d+/\d+(?:\.\d+)?"
+    r"|Eth-Trunk\d+(?:\.\d+)?"
+    r"|MEth\d+/\d+/\d+"
+    r")$"
+)
+# IPv4 토큰
+_IPV4_RE = re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}$")
+
+
+def validate_fault_answer(answer: str, whitelist: set[str]) -> tuple[bool, str, str]:
+    """Fault 답 포맷·reason 검증. 반환: (ok, cleaned, reason).
+
+    각 라인은 `node;target;reason` 3-field:
+    - node: whitelist 에 포함되는 장비명 (whitelist 가 비어있으면 이 검증 건너뜀)
+    - target: IPv4 주소 (routing fault) 또는 port 토큰 (port fault)
+    - reason: _ALL_FAULT_REASONS 의 exact string
+    reason 이 routing 계열이면 target 은 IP 여야 하고, port 계열이면 port 여야 함.
+    """
+    clean = re.sub(r"<[^>]+>", "", answer)
+    clean = re.sub(r"```[\s\S]*?```", "", clean)
+    clean = clean.strip()
+    if not clean:
+        return False, "", "empty answer"
+    lines = [ln.strip() for ln in clean.split("\n") if ln.strip()]
+    if not lines:
+        return False, "", "empty answer after cleaning"
+
+    for ln in lines:
+        parts = ln.split(";")
+        if len(parts) != 3:
+            return False, "\n".join(lines), (
+                f"format error (need 3 ';'-separated fields): {ln!r}"
+            )
+        node, target, reason = (p.strip() for p in parts)
+        if any(p != raw for p, raw in zip((node, target, reason), parts)):
+            return False, "\n".join(lines), (
+                f"whitespace around ';' in: {ln!r} (use exact `node;target;reason`)"
+            )
+        if whitelist and node not in whitelist:
+            return False, "\n".join(lines), (
+                f"hallucinated node {node!r} not in VALID DEVICES"
+            )
+        if reason not in _ALL_FAULT_REASONS:
+            return False, "\n".join(lines), (
+                f"reason {reason!r} is not one of the 20 enumerated exact strings"
+            )
+        is_routing = reason in _ROUTING_FAULT_REASONS
+        is_port = reason in _PORT_FAULT_REASONS
+        # OSPF configuration error 는 양쪽 모두 가능 — target 형태로 판단
+        if is_routing and not is_port:
+            if not _IPV4_RE.match(target):
+                return False, "\n".join(lines), (
+                    f"routing fault requires IP target, got {target!r} ({reason!r})"
+                )
+        elif is_port and not is_routing:
+            if not _PORT_TOKEN_RE.match(target):
+                return False, "\n".join(lines), (
+                    f"port fault requires port token, got {target!r} ({reason!r})"
+                )
+        else:
+            # ambiguous reason (OSPF configuration error) — target 이 IP 또는 port 면 OK
+            if not (_IPV4_RE.match(target) or _PORT_TOKEN_RE.match(target)):
+                return False, "\n".join(lines), (
+                    f"target {target!r} is neither IP nor port ({reason!r})"
+                )
+    return True, "\n".join(lines), "ok"
+
+
 def validate_topology_answer(
     answer: str,
     whitelist: set[str],
@@ -668,24 +766,36 @@ def build_type_hint(qtype: str, question_text: str, question_id: int = 0) -> str
         if suspects:
             suspect_list = ", ".join(suspects[:6])
             hint += f"Suspect/relevant nodes: {suspect_list}\n"
-            hint += (
-                f"Step 1: Query ALL relevant nodes simultaneously with:\n"
-                f"  - `display ip routing-table` (check routing)\n"
-                f"  - `display interface brief` (check port status UP/DOWN)\n"
-                f"  - `display current-configuration` (check config for errors)\n"
-            )
-        else:
-            hint += (
-                f"Step 1: Start from source node, trace the path hop-by-hop.\n"
-                f"  - Query `display ip routing-table` on each hop.\n"
-                f"  - Query `display interface brief` to check port status.\n"
-                f"  - Query `display current-configuration` for config errors.\n"
-            )
+
+        # @MX:NOTE: [AUTO] TODO-16 — exact-string reason matrix + multi-fault (compact)
         hint += (
-            f"Step 2: Look for: missing routes, blackhole routes, shutdown ports, IP errors, "
-            f"static route errors, OSPF/BGP misconfig, MTU issues.\n"
-            f"Step 3: For routing faults: node;dest-IP;cause. For port faults: node;port;cause.\n"
-            f"Output ONLY fault lines, one per line."
+            "\nOUTPUT FORMAT (strict): `node;target;reason` per line. Multi-fault → each"
+            " on its own line. No blank lines, no whitespace around `;`.\n"
+            "- Routing fault: target = destination IPv4\n"
+            "- Port fault:    target = port (GE1/0/1 etc.)\n"
+            "\nREASON must be LITERALLY one of these 20 exact strings (no paraphrase):\n"
+            "ROUTING (13): blackhole route | missing static route | static route error |"
+            " ARP configuration error | routing loop | BGP configuration error |"
+            " OSPF configuration error | loopback IP configuration conflict |"
+            " VXLAN configuration error | L3VPN configuration error |"
+            " L2VPN configuration error | IS-IS configuration error |"
+            " SRV6-Policy tunnel planning error\n"
+            "PORT (7): shutdown | interface IP error |"
+            " traffic congestion on port bandwidth | MAC address configuration error |"
+            " VPN configuration missing | OSPF configuration error |"
+            " MTU value configuration error\n"
+            "\nDIAGNOSIS STEPS:\n"
+            "1. Query source + suspects in parallel: routing-table, interface brief,"
+            " current-configuration, arp. Trace destination IP hop-by-hop.\n"
+            "2. Match the FIRST hop where evidence fits ONE reason above. Do NOT stop"
+            " after one — multiple routing faults AND a port fault can coexist; output"
+            " each.\n"
+            "3. Port-fault lines: include ONLY interfaces the question names explicitly"
+            " or that sit on the broken routing path. Do NOT dump all *down interfaces.\n"
+            "4. Check your output: each line's reason must be literally one of the 20"
+            " strings. Paraphrases (e.g. 'missing static', 'port down', 'MAC error')"
+            " are INVALID and will be rejected.\n"
+            "\nOutput ONLY the fault lines. No XML/tool_call/code-blocks/explanation."
         )
         return hint
 
@@ -819,6 +929,8 @@ def find_last_valid_assistant_answer(
             )
         elif qtype == QTYPE_PATH:
             ok, _, _ = validate_path_answer(processed, whitelist, qtype)
+        elif qtype == QTYPE_FAULT:
+            ok, _, _ = validate_fault_answer(processed, whitelist)
         else:
             ok = True
         if ok:
@@ -1495,6 +1607,9 @@ def run_agent(question_id: int, question_text: str) -> dict:
                 _ok, _clean, _reason = validate_topology_answer(
                     _processed, _whitelist, _target, _expected
                 )
+            elif qtype == QTYPE_FAULT:
+                # @MX:NOTE: [AUTO] TODO-16 — Fault answer validation
+                _ok, _clean, _reason = validate_fault_answer(_processed, _whitelist)
             else:
                 _ok, _clean, _reason = validate_path_answer(_processed, _whitelist, qtype)
 
@@ -1526,6 +1641,29 @@ def run_agent(question_id: int, question_text: str) -> dict:
                         f"If a description shows an alias not in the whitelist, resolve it via ARP "
                         f"MAC matching as instructed. "
                         f"No XML, no code blocks, no explanation, no extra lines."
+                    ),
+                })
+                validation_retried = True
+                continue
+            # @MX:NOTE: [AUTO] TODO-16 — Fault 1회 correction retry
+            if not _ok and qtype == QTYPE_FAULT and not validation_retried:
+                log.warning(f"  [Q{question_id}] Fault answer invalid ({_reason}) — correction retry")
+                messages.append({"role": "assistant", "content": content})
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        f"Your fault answer is invalid: {_reason}. "
+                        f"Output lines in EXACT format `node;target;reason` where:\n"
+                        f"- node MUST be one of: {sorted(_whitelist)}\n"
+                        f"- target is IPv4 (for routing fault) or port token like GE1/0/1 "
+                        f"(for port fault)\n"
+                        f"- reason MUST be LITERALLY one of the 20 enumerated strings "
+                        f"listed in the earlier guidance (e.g. 'missing static route', "
+                        f"'static route error', 'shutdown', 'ARP configuration error'). "
+                        f"NO paraphrasing.\n"
+                        f"- Multiple faults on separate lines; no blank lines; no extra "
+                        f"whitespace; semicolons only as separators; no XML/code-blocks/"
+                        f"explanation."
                     ),
                 })
                 validation_retried = True
@@ -1621,6 +1759,11 @@ def run_agent(question_id: int, question_text: str) -> dict:
                             _ok_f, _, _reason_f = validate_path_answer(
                                 _processed_f, _whitelist_f, qtype
                             )
+                        elif qtype == QTYPE_FAULT:
+                            # @MX:NOTE: [AUTO] TODO-16 — forced 분기도 fault validation
+                            _ok_f, _, _reason_f = validate_fault_answer(
+                                _processed_f, _whitelist_f
+                            )
                         else:
                             _ok_f, _reason_f = True, "ok"
 
@@ -1673,6 +1816,22 @@ def run_agent(question_id: int, question_text: str) -> dict:
                                     f"Use ONLY devices from: {sorted(_whitelist_f)}. "
                                     f"No IP addresses, no XML, no tool_call, no code "
                                     f"blocks, no explanation."
+                                )
+                            elif qtype == QTYPE_FAULT:
+                                # @MX:NOTE: [AUTO] TODO-16 — forced fault retry
+                                _retry_msg = (
+                                    f"Your forced fault answer is STILL invalid: "
+                                    f"{_reason_f}. This is your FINAL chance. "
+                                    f"Each line MUST be `node;target;reason` with:\n"
+                                    f"- node in {sorted(_whitelist_f)}\n"
+                                    f"- target: IPv4 (routing fault) or port token "
+                                    f"(port fault)\n"
+                                    f"- reason: LITERAL exact string from the 20 "
+                                    f"enumerated reasons (e.g. 'missing static route', "
+                                    f"'static route error', 'shutdown'). No paraphrase.\n"
+                                    f"Multiple faults on separate lines. No blank lines, "
+                                    f"no extra whitespace, no XML, no tool_call, no "
+                                    f"code blocks, no explanation."
                                 )
                             else:
                                 _retry_msg = (
