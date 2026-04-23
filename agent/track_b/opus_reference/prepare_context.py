@@ -199,7 +199,38 @@ def _interface_description_snippet(qid: int, device: str) -> list[str]:
     for iface, desc in descs.items():
         if desc.strip():
             result.append(f"  {iface}: {desc.strip()}")
+
+    # PJ zone 장비는 display_interface_description.txt 가 비어있고
+    # display_current-configuration.txt 의 `interface X / description Y` 블록에 기록됨
+    if not result:
+        result = _parse_pj_config_description(qid, device)
+
     return result[:20]
+
+
+def _parse_pj_config_description(qid: int, device: str) -> list[str]:
+    """PJ zone: display_current-configuration.txt 에서 `interface / description` 추출."""
+    text = read_file(qid, device, "display_current-configuration.txt")
+    if not text:
+        return []
+
+    # 블록 단위로 `interface X` + 다음 빈 줄까지 스캔
+    result: list[str] = []
+    current_if: Optional[str] = None
+    for raw in text.splitlines():
+        line = raw.rstrip()
+        m = re.match(r"^interface\s+(\S+)", line)
+        if m:
+            current_if = m.group(1)
+            continue
+        if current_if and line.startswith(" description "):
+            desc = line[len(" description "):].strip()
+            if desc:
+                result.append(f"  {current_if}: {desc}")
+            current_if = None
+    return result
+
+
 
 
 # ---------------------------------------------------------------------------
