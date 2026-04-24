@@ -80,6 +80,31 @@
 
 모든 성공한 delta 를 합친 `submission_028_combined.csv` 생성 후 제출.
 
+**Merger 사용법** (자동 생성):
+```bash
+# 예: 020, 022, 025 가 성공했다면
+python3 agent/track_b/submission/merge_probes.py 020 022 025
+
+# 생성된 파일 검증
+python3 agent/track_b/submission/audit_format.py \
+  agent/track_b/submission/submission_028_20260424_combined_020_022_025.csv
+
+# PASS 면 Zindi 업로드
+```
+
+- merge_probes.py 는 baseline(018) 에서 출발하여 각 성공 probe 의 delta 만 추출/통합
+- 충돌 시 warning 출력 (나중 probe 우선)
+- 서로 다른 scenario_id 건드리는 probe 는 충돌 없이 합산
+
+### Phase 4 — 포맷 검증 (제출 전 항상 실행)
+
+```bash
+python3 agent/track_b/submission/audit_format.py \
+  agent/track_b/submission/submission_XXX_*.csv
+```
+
+PASS 해야만 업로드. FAIL 시 오류 메시지 확인 후 수정.
+
 ---
 
 ## 규칙
