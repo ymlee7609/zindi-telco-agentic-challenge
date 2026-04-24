@@ -449,16 +449,22 @@ def port_sort_key(port: str) -> tuple:
 
 # Eth-Trunk 블록 시작: "Eth-Trunk1's state information is:"
 _ETH_TRUNK_HEAD = re.compile(r"^Eth-Trunk(\d+(?:\.\d+)?)'s state information is:")
-# Operating Status: up / down
-_ETH_TRUNK_OP_STATUS = re.compile(r"Operating\s+Status:\s*(\S+)", re.IGNORECASE)
-# Working Mode: Static / Normal
-_ETH_TRUNK_WMODE = re.compile(r"Working\s+Mode:\s*(\S+)", re.IGNORECASE)
+# Operating Status / Operate status: up / down (벤더/버전에 따라 다름)
+_ETH_TRUNK_OP_STATUS = re.compile(
+    r"Operat(?:ing|e)\s+[Ss]tatus:\s*(\S+)",
+)
+# Working Mode / WorkingMode: Static / Normal / NORMAL
+_ETH_TRUNK_WMODE = re.compile(r"Working\s*Mode:\s*(\S+)", re.IGNORECASE)
 
-# Static trunk member row: "GE1/0/9    Unselect  100M   32768 ..."
-# Normal trunk member row: "GE1/0/3    Down      1"
-# 공통: 첫 컬럼이 포트명, 두 번째가 상태
+# Member row 포맷 2종:
+#   Static (LACP):  "GE1/0/9    Unselect  100M   32768 ..."
+#   Normal:         "GigabitEthernet1/0/4    Up    1"
+# 공통: 첫 컬럼이 포트명, 두 번째가 상태. 포트명은 GigabitEthernet/GE/XGE/... 모두 허용
 _ETH_TRUNK_MEMBER = re.compile(
-    r"^\s*((?:GE|XGE|10GE|25GE|40GE|100GE|Eth-Trunk)\S*)\s+"
+    r"^\s*("
+    r"(?:GigabitEthernet|XGigabitEthernet|Ethernet|GE|XGE|10GE|25GE|40GE|100GE|Eth-Trunk)"
+    r"\S*"
+    r")\s+"
     r"(Selected|Unselect|Up|Down)\b",
     re.IGNORECASE,
 )
