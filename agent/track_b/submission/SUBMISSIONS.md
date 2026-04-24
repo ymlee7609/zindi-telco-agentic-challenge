@@ -17,12 +17,14 @@
 - **현재 최고점**: **serial 018 = 0.48** (Track B 기준)
 - **이전 최고**: serial 016 = 0.44 (+0.04 상승 확인)
 - **017 상태**: **INVALID — 제출 금지**
-- **다음 serial**: 019
+- **019 상태**: 생성 완료, Zindi 제출 대기
+- **다음 serial**: 020
 
 ## 제출 이력 (Zindi에 실제 제출된 것)
 
 | Serial | File | 제출일 | Zindi (Track B) | 비고 |
 |---|---|---|---|---|
+| 019 | `submission_019_20260424_topo_eth_trunk.csv` | (대기) | (미제출) | base=018, **Q31/Q32 Topology Tier 5 delta**. Q31 `Janus-Prime-01(GE1/0/3)->Aegis-Prime-02(GE1/0/2)` 추가 (Aegis-Prime-02 자체 desc 확증). Q32 `Aegis-Prime-01(GE1/0/2)->Janus-Prime-01(GE1/0/5)` 추가 (Aegis-Prime-01 자체 desc `to Janus-Prime-01-GE1/0/5` + Janus-Prime-01 reverse desc 양방향 확증). 예상 +0.02~0.04 |
 | **018** | `submission_018_20260423_ground_truth.csv` | 2026-04-23 | **0.48** ✅ | **현재 최고** — base=016, Q25/Q28 HIGH Opus 답 교체. 예상 +0.04 정확 적중. Q25 (Alpha-Center-02 static route error), Q28 (Gamma-Axis-02 routing loop) 모두 정답 확정 |
 | 017 | `submission_017_20260423_topo_newline_fix.csv` | — | **무효** | literal `\n` → 실제 개행 변환 시도 (포맷 위반). 제출 안 됨 |
 | 016 | `submission_v12_topofault_rt.csv` | 2026-04-23 | 0.44 | 이전 baseline, 018 개선 시작점 |
