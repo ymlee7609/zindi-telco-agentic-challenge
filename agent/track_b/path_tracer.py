@@ -15,10 +15,15 @@ from pathlib import Path
 
 from cli_parsers import (
     find_ip_owner,
+    find_evpn_route_for_ip,
+    find_vtep_owner,
     list_devices,
+    local_vtep_ip,
     lookup_longest_prefix,
+    parse_bgp_evpn,
     parse_ip_interface_brief,
     parse_lldp,
+    parse_vxlan_tunnel,
     reverse_description_lookup,
 )
 
@@ -540,6 +545,117 @@ def solve_all_paths() -> dict[int, dict]:
         }
 
     return results
+
+
+# ---------------------------------------------------------------------------
+# 7.5 EVPN VXLAN Overlay Tracer (Q34~Q38 PJ zone)
+# ---------------------------------------------------------------------------
+
+def trace_overlay_vxlan(
+    qid: int, src: str, dst_ip: str, max_underlay_hops: int = 10
+) -> list[str]:
+    """src 에서 dst_ip 까지 VXLAN overlay 경로를 계산.
+
+    Steps:
+      1. src 의 local VTEP IP 확인 (없으면 빈 리스트)
+      2. src 의 BGP EVPN 테이블에서 dst_ip 매칭 route 찾기
+      3. route next_hop = egress VTEP IP → 해당 device (egress VTEP owner)
+      4. src → egress VTEP underlay path (routing table 기반 hop-by-hop)
+      5. egress VTEP 가 dst_ip 를 direct L2 로 cover → 마지막 노드로 추가
+
+    반환:
+      path list. 빈 리스트면 overlay tracing 불가 (underlay fallback 필요).
+    """
+    local_vtep = local_vtep_ip(qid, src)
+    if not local_vtep:
+        return []
+
+    evpn_route = find_evpn_route_for_ip(qid, src, dst_ip)
+    if evpn_route is None:
+        return []
+
+    egress_vtep = evpn_route.next_hop
+    if egress_vtep in (local_vtep, "0.0.0.0"):
+        # local VTEP — src 가 egress 이기도 함 (direct L2)
+        # Mac route 라면 dst device 는 같은 subnet 내 다른 host
+        return [src]
+
+    egress_owners = find_vtep_owner(qid, egress_vtep)
+    if not egress_owners:
+        return []
+    egress_dev = egress_owners[0]
+
+    # underlay path: src → egress_dev
+    if src == egress_dev:
+        return [src]
+
+    underlay = [src]
+    cur = src
+    visited = {src}
+    for _ in range(max_underlay_hops):
+        # src 의 routing table 에서 egress_vtep IP 로 가는 nexthop
+        r = lookup_longest_prefix(qid, cur, egress_vtep)
+        if r is None:
+            break
+        if r.nexthop in ("0.0.0.0", "127.0.0.1"):
+            # cur = egress
+            if cur != egress_dev:
+                underlay.append(egress_dev)
+            break
+        owners = find_ip_owner(qid, r.nexthop)
+        if not owners:
+            break
+        nxt = owners[0]
+        if nxt in visited:
+            break
+        underlay.append(nxt)
+        visited.add(nxt)
+        if nxt == egress_dev:
+            break
+        cur = nxt
+
+    if underlay[-1] != egress_dev:
+        underlay.append(egress_dev)
+
+    return underlay
+
+
+def trace_path_overlay_aware(
+    qid: int, src: str, dst_ip: str, dst_node: str | None = None
+) -> list[str]:
+    """overlay-aware path tracing.
+
+    PJ zone (qid >= 29) 이고 EVPN route 가 있으면 overlay tracer 우선.
+    아니면 기존 underlay hop-by-hop fallback.
+    """
+    # overlay 시도
+    if qid >= 29:
+        overlay = trace_overlay_vxlan(qid, src, dst_ip)
+        if overlay and len(overlay) >= 2:
+            if dst_node and overlay[-1] != dst_node:
+                overlay.append(dst_node)
+            return overlay
+
+    # Fallback: underlay hop-by-hop
+    path = [src]
+    cur = src
+    visited = {src}
+    for _ in range(15):
+        r = lookup_longest_prefix(qid, cur, dst_ip)
+        if r is None or r.nexthop in ("0.0.0.0", "127.0.0.1"):
+            break
+        owners = find_ip_owner(qid, r.nexthop)
+        if not owners:
+            break
+        nxt = owners[0]
+        if nxt in visited:
+            break
+        path.append(nxt)
+        visited.add(nxt)
+        cur = nxt
+    if dst_node and path[-1] != dst_node:
+        path.append(dst_node)
+    return path
 
 
 # ---------------------------------------------------------------------------
