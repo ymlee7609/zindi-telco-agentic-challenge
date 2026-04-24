@@ -17,14 +17,26 @@
 - **현재 최고점**: **serial 018 = 0.48** (Track B 기준)
 - **이전 최고**: serial 016 = 0.44 (+0.04 상승 확인)
 - **017 상태**: **INVALID — 제출 금지**
-- **019 상태**: 생성 완료, Zindi 제출 대기
-- **다음 serial**: 020
+- **019 상태**: 제출됨, 결과 0.48 (Q31/Q32 링크 추가 실패)
+- **020~027 상태**: 생성 완료, **업로드 대기** (사용자 수동 업로드 필요)
+- **다음 serial**: 028 (최종 통합, 020~027 결과 확인 후 생성)
+- **남은 Zindi 제출**: 9회 (018+019 소진 후 10회 한도 내)
+
+**실행 매뉴얼**: `agent/track_b/submission/UPLOAD_MANUAL.md` 참조
 
 ## 제출 이력 (Zindi에 실제 제출된 것)
 
 | Serial | File | 제출일 | Zindi (Track B) | 비고 |
 |---|---|---|---|---|
-| 019 | `submission_019_20260424_topo_eth_trunk.csv` | (대기) | (미제출) | base=018, **Q31/Q32 Topology Tier 5 delta**. Q31 `Janus-Prime-01(GE1/0/3)->Aegis-Prime-02(GE1/0/2)` 추가 (Aegis-Prime-02 자체 desc 확증). Q32 `Aegis-Prime-01(GE1/0/2)->Janus-Prime-01(GE1/0/5)` 추가 (Aegis-Prime-01 자체 desc `to Janus-Prime-01-GE1/0/5` + Janus-Prime-01 reverse desc 양방향 확증). 예상 +0.02~0.04 |
+| 027 | `submission_027_20260424_pj_fault_group_a_prime02.csv` | (대기) | (미제출) | base=018, Group A (Q39/Q43/Q46) node: Demeter-Prime-01 → Demeter-Prime-02. 노드 오식별 가설. 성공 시 +0.06 |
+| 026 | `submission_026_20260424_pj_path_q34_q37_direct_l2.csv` | (대기) | (미제출) | base=018, Q34 path: 5-hop VXLAN overlay → 1-hop direct L2 (`Hermes-Prime-01->Hermes-Prime-02`). PJ Path native routing 가설. 성공 시 +0.02 (Q37도 같은 패턴이면 +0.04) |
+| 025 | `submission_025_20260424_pj_topo_q29_swap.csv` | (대기) | (미제출) | base=018, Q29 방향 swap (target 왼쪽 → target 오른쪽). HIGH confidence인데 오답이면 포맷 방향성 이슈 가설. 성공 시 +0.02 (Q30~Q33 동일 적용 시 +0.10) |
+| 024 | `submission_024_20260424_pj_fault_abd_bgp.csv` | (대기) | (미제출) | base=018, Group A+B+D (7문제) reason: missing static route → BGP configuration error. 020/021/023 모두 실패 시 최종 대안. EVPN은 BGP 기반. 성공 시 +0.14 |
+| 023 | `submission_023_20260424_pj_fault_group_bd_vxlan.csv` | (대기) | (미제출) | base=018, Group B+D (Q40/Q41/Q47/Q48) reason: missing static route → VXLAN configuration error. 020 성공 시 확장 단계. 성공 시 +0.08 |
+| 022 | `submission_022_20260424_pj_fault_group_c_parent_trunk.csv` | (대기) | (미제출) | base=018, Group C (Q44/Q45) port: Eth-Trunk2.60 → Eth-Trunk2 (parent). 모든 sub-IF down + parent도 down 상태. parent trunk shutdown 가설. 성공 시 +0.04 |
+| 021 | `submission_021_20260424_pj_fault_group_a_l3vpn.csv` | (대기) | (미제출) | base=018, Group A (Q39/Q43/Q46) reason: missing static route → L3VPN configuration error. Demeter-Prime-01은 VPN-instance 7개 설정 (vpn1~6+lb-vpn). 020 실패 시 대안. 성공 시 +0.06 |
+| 020 | `submission_020_20260424_pj_fault_group_a_vxlan.csv` | (대기) | (미제출) | base=018, Group A (Q39/Q43/Q46) reason: missing static route → VXLAN configuration error. PJ zone EVPN/VXLAN overlay 환경이라 native missing이 아닌 VXLAN 설정 이슈 가설. **첫 업로드 권장**. 성공 시 +0.06 |
+| 019 | `submission_019_20260424_topo_eth_trunk.csv` | 2026-04-24 | 0.48 | base=018, Q31/Q32 Topology Tier 5 delta (raw description 교차확증 추가 링크). 점수 변화 없음 → Q31/Q32 둘 다 이미 오답 상태 시사 (PJ zone 전반 오답 가설 강화) |
 | **018** | `submission_018_20260423_ground_truth.csv` | 2026-04-23 | **0.48** ✅ | **현재 최고** — base=016, Q25/Q28 HIGH Opus 답 교체. 예상 +0.04 정확 적중. Q25 (Alpha-Center-02 static route error), Q28 (Gamma-Axis-02 routing loop) 모두 정답 확정 |
 | 017 | `submission_017_20260423_topo_newline_fix.csv` | — | **무효** | literal `\n` → 실제 개행 변환 시도 (포맷 위반). 제출 안 됨 |
 | 016 | `submission_v12_topofault_rt.csv` | 2026-04-23 | 0.44 | 이전 baseline, 018 개선 시작점 |
