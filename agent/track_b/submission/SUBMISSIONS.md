@@ -18,9 +18,11 @@
 - **이전 최고**: serial 016 = 0.44 (+0.04 상승 확인)
 - **017 상태**: **INVALID — 제출 금지**
 - **019 상태**: 제출됨, 결과 0.48 (Q31/Q32 링크 추가 실패)
-- **020~027 상태**: 생성 완료, **업로드 대기** (사용자 수동 업로드 필요)
-- **다음 serial**: 028 (최종 통합, 020~027 결과 확인 후 생성)
-- **남은 Zindi 제출**: 9회 (018+019 소진 후 10회 한도 내)
+- **020/022/025/026/027 상태**: 제출됨, **모두 0.48 유지** (5개 독립 영역 probe 전부 실패)
+- **021/023/024 상태**: 생성됨, **업로드 불필요** (같은 가설 영역, 020/024 실패로 의미 소진)
+- **028 상태**: SANITY CHECK probe 생성 완료, **업로드 대기** ← **다음 행동**
+- **이상 현상**: 5개 서로 다른 영역 probe 전부 0.48 유지 → 채점 시스템 재진단 필요
+- **참고 문서**: `.moai/reports/track_b_scoring_anomaly_analysis.md`
 
 **실행 매뉴얼**: `agent/track_b/submission/UPLOAD_MANUAL.md` 참조
 
@@ -28,7 +30,12 @@
 
 | Serial | File | 제출일 | Zindi (Track B) | 비고 |
 |---|---|---|---|---|
-| 027 | `submission_027_20260424_pj_fault_group_a_prime02.csv` | (대기) | (미제출) | base=018, Group A (Q39/Q43/Q46) node: Demeter-Prime-01 → Demeter-Prime-02. 노드 오식별 가설. 성공 시 +0.06 |
+| **028** | `submission_028_20260424_sanity_check.csv` | (대기) | (미제출) | **SANITY CHECK — Zindi 채점 엔진 진단용**. HIGH 확정 Traditional 3문제(Q1 Topology/Q7 Path/Q17 Fault) 를 의도적 오답으로 교체. 정상 채점 시 -0.06 예상. 0.48 유지 시 채점 미작동 확정. 020~027 5개가 모두 0.48 유지 → 이 probe 가 다음 결정적 진단 |
+| 027 | `submission_027_20260424_pj_fault_group_a_prime02.csv` | 2026-04-24 | 0.48 | 제출 완료, 변화 없음. Group A node Prime-02 가설 실패 |
+| 026 | `submission_026_20260424_pj_path_q34_q37_direct_l2.csv` | 2026-04-24 | 0.48 | 제출 완료, 변화 없음. Q34 direct L2 가설 실패 |
+| 025 | `submission_025_20260424_pj_topo_q29_swap.csv` | 2026-04-24 | 0.48 | 제출 완료, 변화 없음. Q29 direction swap 가설 실패 |
+| 022 | `submission_022_20260424_pj_fault_group_c_parent_trunk.csv` | 2026-04-24 | 0.48 | 제출 완료, 변화 없음. Eth-Trunk parent 가설 실패 |
+| 020 | `submission_020_20260424_pj_fault_group_a_vxlan.csv` | 2026-04-24 | 0.48 | 제출 완료, 변화 없음. VXLAN configuration error 가설 실패 |
 | 026 | `submission_026_20260424_pj_path_q34_q37_direct_l2.csv` | (대기) | (미제출) | base=018, Q34 path: 5-hop VXLAN overlay → 1-hop direct L2 (`Hermes-Prime-01->Hermes-Prime-02`). PJ Path native routing 가설. 성공 시 +0.02 (Q37도 같은 패턴이면 +0.04) |
 | 025 | `submission_025_20260424_pj_topo_q29_swap.csv` | (대기) | (미제출) | base=018, Q29 방향 swap (target 왼쪽 → target 오른쪽). HIGH confidence인데 오답이면 포맷 방향성 이슈 가설. 성공 시 +0.02 (Q30~Q33 동일 적용 시 +0.10) |
 | 024 | `submission_024_20260424_pj_fault_abd_bgp.csv` | (대기) | (미제출) | base=018, Group A+B+D (7문제) reason: missing static route → BGP configuration error. 020/021/023 모두 실패 시 최종 대안. EVPN은 BGP 기반. 성공 시 +0.14 |
