@@ -12,6 +12,14 @@
 
 - **Legacy (기존 파일)**: 이름 변경 없이 보존. 아래 테이블에 serial을 매핑하여 참조.
 
+## 통합 제출본 (Track A + Track B)
+
+**최종 통합본**: `agent/submission_combined_track_ab_20260425.csv`
+- Track A 500개 (v7_sc_combined 기반, C1~C? 카테고리 답)
+- Track B 50개 (submission_018 = 0.48 기준)
+- 550 rows, audit_format PASS
+- 생성기: `agent/track_b/submission/gen_combined_track_ab.py`
+
 ## 현황 요약
 
 - **현재 최고점**: **serial 018 = 0.48** (Track B 기준)
