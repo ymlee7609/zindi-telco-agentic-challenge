@@ -1,17 +1,17 @@
 """Track A + Track B 통합 제출본 생성기.
 
-소스:
-  - Track A best: agent/track_a/submission/submission_v7_sc_combined.csv
-                   (Track A 500개 + Track B 50개 모두 채워진 상태)
+소스 (2026-04-27 갱신):
+  - Track A best: agent/common/submission/submission_042_20260427_v9_018.csv
+                   (Track A 500개 v9 답 + Track B 50개 채워진 상태)
   - Track B best: agent/track_b/submission/submission_018_20260423_ground_truth.csv
                    (Zindi 0.48 = 24/50)
 
 검증:
-  v7_sc_combined 의 Track B 50 == submission_018 의 Track B 50 (100% 일치 확인됨)
+  042 v9 의 Track B 50 == submission_018 의 Track B 50 (100% 일치 확인됨)
 
 출력:
   agent/submission_combined_track_ab_20260425.csv
-  - Track A: v7_sc_combined 그대로
+  - Track A: 042 v9 답
   - Track B: 018 강제 sync (정합성 보장)
   - 550 rows, audit_format PASS 보장
 """
@@ -22,7 +22,7 @@ import csv
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent.parent.parent
-_TRACK_A = _ROOT / "agent" / "track_a" / "submission" / "submission_v7_sc_combined.csv"
+_TRACK_A = _ROOT / "agent" / "common" / "submission" / "submission_042_20260427_v9_018.csv"
 _TRACK_B = _ROOT / "agent" / "track_b" / "submission" / "submission_018_20260423_ground_truth.csv"
 _OUT = _ROOT / "agent" / "submission_combined_track_ab_20260425.csv"
 

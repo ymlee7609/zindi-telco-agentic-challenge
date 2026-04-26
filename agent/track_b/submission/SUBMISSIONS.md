@@ -14,11 +14,15 @@
 
 ## 통합 제출본 (Track A + Track B)
 
-**최종 통합본**: `agent/submission_combined_track_ab_20260425.csv`
-- Track A 500개 (v7_sc_combined 기반, C1~C? 카테고리 답)
-- Track B 50개 (submission_018 = 0.48 기준)
+**최종 통합본**: `agent/submission_combined_track_ab_20260425.csv` (2026-04-27 v9 기반 갱신)
+- Track A 500개 (**v9 답 = `agent/common/submission/submission_042_20260427_v9_018.csv` 기반**, C1~C15 분포)
+- Track B 50개 (submission_018 = 0.48 기준, v9 의 Track B와 100% 일치)
 - 550 rows, audit_format PASS
 - 생성기: `agent/track_b/submission/gen_combined_track_ab.py`
+
+이력:
+- v1 (2026-04-25): Track A v7_sc_combined 기반 — deprecated
+- v2 (2026-04-27): **Track A v9 기반** — 현재 표준
 
 ## 현황 요약
 
