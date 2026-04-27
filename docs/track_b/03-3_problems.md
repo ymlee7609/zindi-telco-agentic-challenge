@@ -61,11 +61,11 @@ PJ 22문제 정답 카테고리 진단을 위해 multi-answer differential probe
 - **주변 노드**: `in`
 - **출력 형식**: `Gamma-Aegis-01(포트)->원격노드(포트)` (라인당 1개)
 
-**현재 답변 (v1, 미검증):**
+**정답 (v9 BEST 0.56)**:
 ```
 Gamma-Aegis-01(GE1/0/0)->Gamma-Portal-01(GE1/0/4)
 Gamma-Aegis-01(GE1/0/1)->Gamma-Portal-02(GE1/0/4)
-Gamma-Aegis-01(GE1/0/2)->Gamma-Aegis-02(GE0/0/2)
+Gamma-Aegis-01(GE1/0/2)->Gamma-Aegis-02(GE1/0/2)
 ```
 
 ### Q2
@@ -75,14 +75,14 @@ Gamma-Aegis-01(GE1/0/2)->Gamma-Aegis-02(GE0/0/2)
 - **주변 노드**: `itself`
 - **출력 형식**: `Gamma-Axis-02(포트)->원격노드(포트)` (라인당 1개)
 
-**현재 답변 (v2, 미검증):**
+**정답 (v9 BEST 0.56)**:
 ```
-Gamma-Axis-02(GE1/0/5)->Gamma-Portal-01(GE1/0/2)
-Gamma-Axis-02(GE1/0/6)->Gamma-Portal-02(GE1/0/2)
 Gamma-Axis-02(GE1/0/1)->Gamma-Node-01(GE1/0/2)
 Gamma-Axis-02(GE1/0/2)->Gamma-Node-02(GE1/0/2)
 Gamma-Axis-02(GE1/0/3)->Gamma-Node-03(GE1/0/2)
 Gamma-Axis-02(GE1/0/4)->Gamma-Node-04(GE1/0/2)
+Gamma-Axis-02(GE1/0/5)->Gamma-Portal-01(GE1/0/2)
+Gamma-Axis-02(GE1/0/6)->Gamma-Portal-02(GE1/0/2)
 ```
 
 ### Q3
@@ -91,11 +91,11 @@ Gamma-Axis-02(GE1/0/4)->Gamma-Node-04(GE1/0/2)
 - **직접 쿼리 가능**: 아니오
 - **출력 형식**: `Beta-Aegis-02(포트)->원격노드(포트)` (라인당 1개)
 
-**현재 답변 (v1, 미검증):**
+**정답 (v9 BEST 0.56)**:
 ```
 Beta-Aegis-02(GE1/0/0)->Beta-Portal-01(GE1/0/5)
 Beta-Aegis-02(GE1/0/1)->Beta-Portal-02(GE1/0/5)
-Beta-Aegis-02(GE1/0/2)->Beta-Aegis-01(GE0/0/2)
+Beta-Aegis-02(GE1/0/2)->Beta-Aegis-01(GE1/0/2)
 ```
 
 ### Q4
@@ -104,13 +104,13 @@ Beta-Aegis-02(GE1/0/2)->Beta-Aegis-01(GE0/0/2)
 - **직접 쿼리 가능**: 아니오
 - **출력 형식**: `Beta-Portal-02(포트)->원격노드(포트)` (라인당 1개)
 
-**현재 답변 (v1, 미검증):**
+**정답 (v9 BEST 0.56)**:
 ```
-Beta-Portal-02(GE1/0/1)->Beta-Axis-01(GE1/0/1)
-Beta-Portal-02(GE1/0/2)->Beta-Axis-02(GE1/0/1)
+Beta-Portal-02(GE1/0/1)->Beta-Axis-01(GE1/0/6)
+Beta-Portal-02(GE1/0/2)->Beta-Axis-02(GE1/0/6)
 Beta-Portal-02(GE1/0/3)->Beta-Portal-01(GE1/0/3)
-Beta-Portal-02(GE1/0/4)->Beta-Aegis-01(GE0/0/1)
-Beta-Portal-02(GE1/0/5)->Beta-Aegis-02(GE0/0/1)
+Beta-Portal-02(GE1/0/4)->Beta-Aegis-01(GE1/0/1)
+Beta-Portal-02(GE1/0/5)->Beta-Aegis-02(GE1/0/1)
 Beta-Portal-02(GE1/0/6)->Alpha-Center-01(GE1/0/2)
 Beta-Portal-02(GE1/0/7)->Alpha-Center-02(GE1/0/2)
 ```
@@ -121,7 +121,7 @@ Beta-Portal-02(GE1/0/7)->Alpha-Center-02(GE1/0/2)
 - **직접 쿼리 가능**: 아니오
 - **출력 형식**: `Delta-Node-01(포트)->원격노드(포트)` (라인당 1개)
 
-**현재 답변 (v1, 미검증):**
+**정답 (v9 BEST 0.56)**:
 ```
 Delta-Node-01(GE1/0/1)->Delta-Axis-01(GE1/0/1)
 Delta-Node-01(GE1/0/2)->Delta-Axis-02(GE1/0/1)
@@ -134,7 +134,7 @@ Delta-Node-01(GE1/0/3)->Delta-Node-02(GE1/0/3)
 - **직접 쿼리 가능**: 아니오
 - **출력 형식**: `Delta-Axis-01(포트)->원격노드(포트)` (라인당 1개)
 
-**정답 (수동 검증):**
+**정답 (v9 BEST 0.56)**:
 ```
 Delta-Axis-01(GE1/0/1)->Delta-Node-01(GE1/0/1)
 Delta-Axis-01(GE1/0/2)->Delta-Node-02(GE1/0/1)
@@ -150,11 +150,10 @@ Delta-Axis-01(GE1/0/6)->Delta-Portal-02(GE1/0/1)
 - **직접 쿼리 가능**: 아니오
 - **출력 형식**: `Demeter-Prime-01(포트)->원격노드(포트)` (라인당 1개)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
 Demeter-Prime-01(GE1/0/0)->Atlas-Prime-01(GE1/0/2)
 Demeter-Prime-01(GE1/0/1)->Atlas-Prime-02(GE1/0/2)
-Demeter-Prime-01(GE1/0/5)->Hermes-Prime-01(GE1/0/4)
 ```
 
 ### Q30
@@ -163,7 +162,7 @@ Demeter-Prime-01(GE1/0/5)->Hermes-Prime-01(GE1/0/4)
 - **직접 쿼리 가능**: 아니오
 - **출력 형식**: `Atlas-Prime-01(포트)->원격노드(포트)` (라인당 1개)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
 Atlas-Prime-01(GE1/0/0)->Janus-Prime-01(GE1/0/0)
 Atlas-Prime-01(GE1/0/1)->Janus-Prime-02(GE1/0/0)
@@ -177,12 +176,11 @@ Atlas-Prime-01(GE1/0/3)->Demeter-Prime-02(GE1/0/0)
 - **직접 쿼리 가능**: 아니오
 - **출력 형식**: `Janus-Prime-01(포트)->원격노드(포트)` (라인당 1개)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
 Janus-Prime-01(GE1/0/0)->Atlas-Prime-01(GE1/0/0)
 Janus-Prime-01(GE1/0/1)->Atlas-Prime-02(GE1/0/0)
 Janus-Prime-01(GE1/0/2)->PX1(GE1/0/0)
-Janus-Prime-01(GE1/0/3)->Aegis-Prime-02(GE1/0/2)
 Janus-Prime-01(GE1/0/4)->Janus-Prime-02(GE1/0/4)
 Janus-Prime-01(GE1/0/5)->Aegis-Prime-01(GE1/0/2)
 ```
@@ -193,11 +191,11 @@ Janus-Prime-01(GE1/0/5)->Aegis-Prime-01(GE1/0/2)
 - **직접 쿼리 가능**: 아니오
 - **출력 형식**: `Aegis-Prime-01(포트)->원격노드(포트)` (라인당 1개)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
-Aegis-Prime-01(GE1/0/3)->Eon-Node-01(GE1/0/1)
 Aegis-Prime-01(GE1/0/0)->Janus-Prime-02(GE1/0/5)
 Aegis-Prime-01(GE1/0/1)->Aegis-Prime-02(GE1/0/1)
+Aegis-Prime-01(GE1/0/3)->Eon-Node-01(GE1/0/1)
 ```
 
 ### Q33
@@ -206,7 +204,7 @@ Aegis-Prime-01(GE1/0/1)->Aegis-Prime-02(GE1/0/1)
 - **직접 쿼리 가능**: 아니오
 - **출력 형식**: `Janus-Node-02(포트)->원격노드(포트)` (라인당 1개)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
 Janus-Node-02(GE1/0/2)->Atlas-Node-01(GE1/0/2)
 Janus-Node-02(GE1/0/3)->Atlas-Node-02(GE1/0/2)
@@ -228,7 +226,7 @@ Janus-Node-02(GE1/0/5)->Janus-Node-01(GE1/0/5)
 - **목적지 IP**: `192.168.70.22`
 - **출력 형식**: `NodeA->NodeB->...->NodeZ` (단일 라인)
 
-**정답 (수동 검증):**
+**정답 (v9 BEST 0.56)**:
 ```
 Beta-Node-01->Beta-Axis-02->Beta-Portal-02->Alpha-Center-02->Gamma-Portal-02->Gamma-Axis-02->Gamma-Node-01
 ```
@@ -240,9 +238,9 @@ Beta-Node-01->Beta-Axis-02->Beta-Portal-02->Alpha-Center-02->Gamma-Portal-02->Ga
 - **목적지 인터페이스**: `GE1/0/2`
 - **출력 형식**: `NodeA->NodeB->...->NodeZ` (단일 라인)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
-Gamma-Node-01->Gamma-Axis-02->Gamma-Portal-02->Alpha-Center-02->Delta-Portal-01->Delta-Axis-02->Delta-Node-01
+Gamma-Node-01->Gamma-Axis-02->Gamma-Portal-02->Alpha-Center-02->Delta-Portal-02->Delta-Axis-02->Delta-Node-01
 ```
 
 ### Q9
@@ -252,9 +250,9 @@ Gamma-Node-01->Gamma-Axis-02->Gamma-Portal-02->Alpha-Center-02->Delta-Portal-01-
 - **목적지 인터페이스**: `GE1/0/2`
 - **출력 형식**: `NodeA->NodeB->...->NodeZ` (단일 라인)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
-Beta-Node-03->Beta-Axis-02->Beta-Portal-02->Alpha-Center-01->Delta-Portal-02->Delta-Axis-02->Delta-Node-03
+Beta-Node-03->Beta-Axis-02->Beta-Portal-02->Alpha-Center-02->Delta-Portal-02->Delta-Axis-02->Delta-Node-03
 ```
 
 ### Q10
@@ -264,7 +262,7 @@ Beta-Node-03->Beta-Axis-02->Beta-Portal-02->Alpha-Center-01->Delta-Portal-02->De
 - **목적지 인터페이스**: `GE1/0/2`
 - **출력 형식**: `NodeA->NodeB->...->NodeZ` (단일 라인)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
 Gamma-Node-01->Gamma-Axis-02->Gamma-Portal-02->Alpha-Center-02->Beta-Portal-02->Beta-Axis-02->Beta-Node-04
 ```
@@ -276,7 +274,7 @@ Gamma-Node-01->Gamma-Axis-02->Gamma-Portal-02->Alpha-Center-02->Beta-Portal-02->
 - **목적지 인터페이스**: `GE1/0/2`
 - **출력 형식**: `NodeA->NodeB->...->NodeZ` (단일 라인)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
 Beta-Node-03->Beta-Axis-02->Beta-Portal-02->Alpha-Center-02
 ```
@@ -289,7 +287,7 @@ Beta-Node-03->Beta-Axis-02->Beta-Portal-02->Alpha-Center-02
 - **경유 노드**: `Gamma-Portal-02`
 - **출력 형식**: `NodeA->NodeB->...->NodeZ` (단일 라인)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
 Beta-Node-01->Beta-Axis-02->Beta-Portal-02->Alpha-Center-02->Gamma-Portal-02->Gamma-Axis-02->Gamma-Node-01
 ```
@@ -301,9 +299,9 @@ Beta-Node-01->Beta-Axis-02->Beta-Portal-02->Alpha-Center-02->Gamma-Portal-02->Ga
 - **목적지 인터페이스**: `GE1/0/4`
 - **출력 형식**: `NodeA->NodeB->...->NodeZ` (단일 라인)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
-Gamma-Node-02->Gamma-Axis-02->Gamma-Portal-02->Alpha-Center-02->Beta-Portal-02->Beta-Axis-02->Beta-Node-03->Beta-Node-04
+Gamma-Node-02->Gamma-Axis-02->Gamma-Portal-02->Alpha-Center-02->Beta-Portal-02->Beta-Axis-02->Beta-Node-04
 ```
 
 ### Q14
@@ -313,7 +311,7 @@ Gamma-Node-02->Gamma-Axis-02->Gamma-Portal-02->Alpha-Center-02->Beta-Portal-02->
 - **목적지 인터페이스**: `GE1/0/2`
 - **출력 형식**: `NodeA->NodeB->...->NodeZ` (단일 라인)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
 Delta-Node-02->Delta-Axis-02->Delta-Portal-02->Alpha-Center-02->Gamma-Portal-02->Gamma-Axis-02->Gamma-Node-02
 ```
@@ -325,7 +323,7 @@ Delta-Node-02->Delta-Axis-02->Delta-Portal-02->Alpha-Center-02->Gamma-Portal-02-
 - **목적지 인터페이스**: `GE1/0/2`
 - **출력 형식**: `NodeA->NodeB->...->NodeZ` (단일 라인)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
 Gamma-Node-04->Gamma-Axis-02->Gamma-Portal-02->Alpha-Center-02->Delta-Portal-02->Delta-Axis-02->Delta-Node-01
 ```
@@ -337,9 +335,9 @@ Gamma-Node-04->Gamma-Axis-02->Gamma-Portal-02->Alpha-Center-02->Delta-Portal-02-
 - **목적지 인터페이스**: `GE1/0/2`
 - **출력 형식**: `NodeA->NodeB->...->NodeZ` (단일 라인)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
-Beta-Aegis-02->Alpha-Center-02->Delta-Portal-02->Delta-Axis-01->Delta-Node-04
+Beta-Aegis-02->Beta-Portal-02->Alpha-Center-02->Delta-Portal-02->Delta-Axis-02->Delta-Node-04
 ```
 
 ### Q34
@@ -348,9 +346,9 @@ Beta-Aegis-02->Alpha-Center-02->Delta-Portal-02->Delta-Axis-01->Delta-Node-04
 - **목적지 IP**: `10.1.1.20`
 - **출력 형식**: `NodeA->NodeB->...->NodeZ` (단일 라인)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
-Hermes-Prime-01->Demeter-Prime-01->Hermes-Prime-02
+Hermes-Prime-01->Demeter-Prime-01->Atlas-Prime-01->Demeter-Prime-02->Hermes-Prime-02
 ```
 
 ### Q35
@@ -359,9 +357,9 @@ Hermes-Prime-01->Demeter-Prime-01->Hermes-Prime-02
 - **목적지 IP**: `20.1.1.10`
 - **출력 형식**: `NodeA->NodeB->...->NodeZ` (단일 라인)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
-Hermes-Prime-01->Demeter-Prime-01->Demeter-Node-01->Hermes-Node-01
+Hermes-Prime-01->Demeter-Prime-01->Atlas-Prime-01->Janus-Prime-01->Aegis-Prime-01->Eon-Node-01->Gaia-Node-01->Janus-Node-01->Atlas-Node-01->Demeter-Node-01->Hermes-Node-01
 ```
 
 ### Q36
@@ -370,9 +368,9 @@ Hermes-Prime-01->Demeter-Prime-01->Demeter-Node-01->Hermes-Node-01
 - **목적지 IP**: `10.1.1.10`
 - **출력 형식**: `NodeA->NodeB->...->NodeZ` (단일 라인)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
-Hermes-Node-01->Demeter-Node-01->Atlas-Node-01->Janus-Node-01->Gaia-Node-01->Eon-Node-01->Aegis-Prime-01->Hermes-Prime-01
+Hermes-Node-01->Demeter-Node-01->Atlas-Node-01->Janus-Node-01->Gaia-Node-01->Eon-Node-01->Aegis-Prime-01->Janus-Prime-01->Atlas-Prime-01->Demeter-Prime-01->Hermes-Prime-01
 ```
 
 ### Q37
@@ -381,7 +379,7 @@ Hermes-Node-01->Demeter-Node-01->Atlas-Node-01->Janus-Node-01->Gaia-Node-01->Eon
 - **목적지 IP**: `20.1.1.20`
 - **출력 형식**: `NodeA->NodeB->...->NodeZ` (단일 라인)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
 Hermes-Node-01->Demeter-Node-01->Atlas-Node-01->Demeter-Node-02->Hermes-Node-02
 ```
@@ -392,9 +390,9 @@ Hermes-Node-01->Demeter-Node-01->Atlas-Node-01->Demeter-Node-02->Hermes-Node-02
 - **목적지 IP**: `20.1.4.20`
 - **출력 형식**: `NodeA->NodeB->...->NodeZ` (단일 라인)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
-Hermes-Prime-01->Demeter-Prime-01->Demeter-Node-02->Hermes-Node-02
+Hermes-Prime-01->Demeter-Prime-01->Atlas-Prime-01->Janus-Prime-01->Aegis-Prime-01->Eon-Node-01->Gaia-Node-01->Janus-Node-01->Atlas-Node-01->Demeter-Node-02->Hermes-Node-02
 ```
 
 ---
@@ -411,9 +409,9 @@ Hermes-Prime-01->Demeter-Prime-01->Demeter-Node-02->Hermes-Node-02
 - **용의 노드**: `Beta-Axis-02`, `Beta-Portal-02`, `Alpha-Center-02`
 - **출력 형식**: `노드;대상;원인` (라인당 1개 장애)
 
-**정답 (수동 검증):**
+**정답 (v9 BEST 0.56)**:
 ```
-Beta-Portal-02;GE1/0/7;shutdown
+Alpha-Center-02;192.168.70.22;missing static route
 ```
 
 ### Q18
@@ -421,10 +419,9 @@ Beta-Portal-02;GE1/0/7;shutdown
 - **시나리오**: Beta-Node-01 is addressing GE1/0/2 port of Gamma-Node-01, but the service is not reachable.
 - **출력 형식**: `노드;대상;원인` (라인당 1개 장애)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
-Beta-Node-01;GE1/0/2;static route error
-Gamma-Node-01;GE1/0/2;static route error
+Gamma-Portal-02;192.168.70.22;missing static route
 ```
 
 ### Q19
@@ -432,9 +429,9 @@ Gamma-Node-01;GE1/0/2;static route error
 - **시나리오**: Beta-Node-01 is addressing the GE1/0/2 port of Gamma-Node-01, but the service is not reachable.
 - **출력 형식**: `노드;대상;원인` (라인당 1개 장애)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
-Beta-Node-01;192.168.70.22;missing static route
+Beta-Portal-02;192.168.70.22;missing static route
 ```
 
 ### Q20
@@ -442,9 +439,9 @@ Beta-Node-01;192.168.70.22;missing static route
 - **시나리오**: Beta-Node-01 is addressing a destination IP in an external zone, which is 192.168.74.13, mask 30, service is unreachable.
 - **출력 형식**: `노드;대상;원인` (라인당 1개 장애)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
-Beta-Node-01;192.168.74.13;missing static route
+Alpha-Center-02;GE1/0/2;shutdown
 ```
 
 ### Q21
@@ -452,9 +449,9 @@ Beta-Node-01;192.168.74.13;missing static route
 - **시나리오**: Beta-Node-01 is addressing 192.168.70.22, mask 30, but the service is not reachable.
 - **출력 형식**: `노드;대상;원인` (라인당 1개 장애)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
-Beta-Node-01;192.168.70.22;missing static route
+Alpha-Center-02;192.168.70.22;missing static route
 ```
 
 ### Q22
@@ -462,9 +459,10 @@ Beta-Node-01;192.168.70.22;missing static route
 - **시나리오**: Beta-Node-02 is addressing the GE1/0/2 port of Gamma-Node-01, but the service is unreachable.
 - **출력 형식**: `노드;대상;원인` (라인당 1개 장애)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
-Beta-Node-02;192.168.70.22;missing static route
+Gamma-Portal-02;GE1/0/2;shutdown
+Gamma-Portal-02;192.168.70.22;missing static route
 ```
 
 ### Q23
@@ -472,9 +470,9 @@ Beta-Node-02;192.168.70.22;missing static route
 - **시나리오**: Delta-Node-01 is addressing an external destination IP of 192.168.74.61, mask 30, and traffic is currently interrupted.
 - **출력 형식**: `노드;대상;원인` (라인당 1개 장애)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
-Delta-Node-01;192.168.74.61;missing static route
+Delta-Axis-02;192.168.74.61;missing static route
 ```
 
 ### Q24
@@ -484,9 +482,9 @@ Delta-Node-01;192.168.74.61;missing static route
 - **목적지/대상**: `Delta-Aegis-02`
 - **출력 형식**: `노드;대상;원인` (라인당 1개 장애)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
-Beta-Aegis-01;192.168.72.78;missing static route
+Delta-Portal-02;GE1/0/5;shutdown
 ```
 
 ### Q25
@@ -494,45 +492,12 @@ Beta-Aegis-01;192.168.72.78;missing static route
 - **시나리오**: Beta-Node-01 is addressing 192.168.70.70, mask 30, but the service is not reachable.
 - **출력 형식**: `노드;대상;원인` (라인당 1개 장애)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
-Beta-Node-01;GE1/0/0;shutdown
-Beta-Node-01;GE1/0/5;shutdown
-Beta-Node-01;GE1/0/6;shutdown
-Beta-Node-01;GE1/0/7;shutdown
-Beta-Node-01;GE1/0/8;shutdown
-Beta-Node-01;GE1/0/9;shutdown
-Beta-Node-01;GE1/1/0;shutdown
-Beta-Node-01;GE1/1/1;shutdown
-Beta-Node-01;GE1/1/2;shutdown
-Beta-Node-01;GE1/1/3;shutdown
-Beta-Node-01;GE1/1/4;shutdown
-Beta-Node-01;GE1/1/5;shutdown
-Beta-Node-01;GE1/1/6;shutdown
-Beta-Node-01;GE1/1/7;shutdown
-Beta-Node-01;GE1/1/8;shutdown
-Beta-Node-01;GE1/1/9;shutdown
-Beta-Node-01;GE2/0/0;shutdown
-Beta-Node-01;GE2/0/1;shutdown
-Beta-Node-01;GE2/0/2;shutdown
-Beta-Node-01;GE2/0/3;shutdown
-Beta-Node-01;GE2/0/4;shutdown
-Beta-Node-01;GE2/0/5;shutdown
-Beta-Node-01;GE2/0/6;shutdown
-Beta-Node-01;GE2/0/7;shutdown
-Beta-Node-01;GE2/0/8;shutdown
-Beta-Node-01;GE2/0/9;shutdown
-Beta-Node-01;GE2/1/0;shutdown
-Beta-Node-01;GE2/1/1;shutdown
-Beta-Node-01;GE2/1/2;shutdown
-Beta-Node-01;GE2/1/3;shutdown
-Beta-Node-01;GE2/1/4;shutdown
-Beta-Node-01;GE2/1/5;shutdown
-Beta-Node-01;GE2/1/6;shutdown
-Beta-Node-01;GE2/1/7;shutdown
-Beta-Node-01;GE2/1/8;shutdown
-Beta-Node-01;GE2/1/9;shutdown
+Alpha-Center-02;192.168.70.70;static route error
 ```
+
+> v8 의 36 lines Beta-Node-01 shutdown 답안은 폐기됨. v9 에서 Alpha-Center-02 단일 답으로 정정 (probe 018 결과 +0.04 검증).
 
 ### Q26
 - **영역**: 
@@ -541,9 +506,9 @@ Beta-Node-01;GE2/1/9;shutdown
 - **목적지/대상**: `Alpha-Center-02`
 - **출력 형식**: `노드;대상;원인` (라인당 1개 장애)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
-Gamma-Node-01;GE1/0/6;shutdown
+Gamma-Axis-02;192.168.74.45;static route error
 ```
 
 ### Q27
@@ -551,9 +516,10 @@ Gamma-Node-01;GE1/0/6;shutdown
 - **시나리오**: Beta-Node-02 is addressing the GE1/0/2 port of Gamma-Node-01, but the service is not reachable.
 - **출력 형식**: `노드;대상;원인` (라인당 1개 장애)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
-Beta-Node-02;192.168.65.157;static route error
+Gamma-Portal-02;GE1/0/2;shutdown
+Gamma-Portal-02;192.168.70.22;missing static route
 ```
 
 ### Q28
@@ -561,9 +527,9 @@ Beta-Node-02;192.168.65.157;static route error
 - **시나리오**: Beta-Node-01 is addressing 192.168.70.93, mask 30, but the service is not reachable.
 - **출력 형식**: `노드;대상;원인` (라인당 1개 장애)
 
-**정답 (v8 제출본)**:
+**정답 (v9 BEST 0.56)**:
 ```
-Beta-Node-01;192.168.70.93;missing static route
+Gamma-Axis-02;192.168.70.93;routing loop
 ```
 
 ### Q39
