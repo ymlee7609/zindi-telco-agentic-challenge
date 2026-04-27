@@ -6,7 +6,7 @@
 이용해 가장 유사한 top-k scenario 를 검색. 검색된 scenario 와 그 정답을 dynamic
 few-shot 으로 agent 에 주입하면 패턴 인식이 강화된다.
 
-특징 (22-dim, P2-1 확장):
+특징 (26-dim, P2-1 + P8/P9/P10 확장):
   # Throughput
   [0] TP min, [1] TP max, [2] TP avg, [3] TP drop ratio (max-min)/max
   # SINR
@@ -28,6 +28,11 @@ few-shot 으로 agent 에 주입하면 패턴 인식이 강화된다.
   [19] Min cell power
   [20] Throughput recovery flag (0=no recovery, 1=has recovery pattern)
   [21] Dominant neighbor RSRP vs serving RSRP delta (P3 overshoot 지표)
+  # P8/P9/P10 확장 (+4 dim) — 신규 패턴 판별
+  [22] Max CovInterFreqA2RsrpThld (P10: -95 vs -105 dBm 차이)
+  [23] Neighbor completeness (P9: 1.0=완전, <0.8=이웃 누락 가능)
+  [24] PDCCH 1SYM ratio (P8: 1.0=전체 1SYM)
+  [25] TP variance (P5 server=극단적 variance vs P8 pdcch=moderate)
 
 Usage (CLI):
     python rag.py --precompute        # train.json → .moai/cache/track_a_train_features.json
@@ -171,6 +176,50 @@ def extract_features(scenario: dict) -> list[float]:
     # 간단 proxy: rsrp_max (best snapshot) 가 avg 보다 크게 높으면 neighbor 경쟁 있음
     serving_spread = rsrp_max - rsrp_avg
 
+    # --- P8/P9/P10 확장 (+4 dim) ---
+    # [22] P10: CovInterFreqA2RsrpThld max (= 가장 높은 threshold; -95 vs -105 차이)
+    cov_thresholds = [
+        _safe_float(c.get("CovInterFreqA2RsrpThld [dBm]"), -105.0) for c in ncd
+    ]
+    max_cov_threshold = max(cov_thresholds) if cov_thresholds else -105.0
+
+    # [23] P9: neighbor_completeness — serving cell의 neighbor list에 포함된 셀 비율
+    # 비율이 낮으면 강한 이웃 셀이 neighbor list에서 누락되어 핸드오버 불가 가능성
+    neighbor_completeness = 1.0
+    if ncd:
+        all_pcis = {c.get("PCI", "").strip() for c in ncd if c.get("PCI", "").strip()}
+        neighbor_lists = []
+        for c in ncd:
+            nlist = c.get("PCell Neighbor Cell (gNodeBID_ARFCN_PCI)", "")
+            # 포맷: [3279943_504990_420,3267220_504990_966,...]
+            npci = set()
+            for entry in nlist.strip("[]").split(","):
+                parts = entry.strip().split("_")
+                if len(parts) >= 3:
+                    npci.add(parts[2])  # PCI 부분
+            neighbor_lists.append(npci)
+        # 각 cell의 neighbor list에 다른 cell들의 PCI가 포함되어 있는지 확인
+        coverage_scores = []
+        for i, c in enumerate(ncd):
+            my_pci = c.get("PCI", "").strip()
+            other_pcis = all_pcis - {my_pci}
+            if not other_pcis:
+                continue
+            covered = sum(1 for p in other_pcis if p in neighbor_lists[i])
+            coverage_scores.append(covered / len(other_pcis) if other_pcis else 1.0)
+        neighbor_completeness = (
+            sum(coverage_scores) / len(coverage_scores)
+            if coverage_scores else 1.0
+        )
+
+    # [24] P8: pdcch_1sym_ratio — PdcchOccupiedSymbolNum이 1SYM인 셀 비율
+    pdcch_values = [c.get("PdcchOccupiedSymbolNum", "").strip() for c in ncd]
+    pdcch_1sym = sum(1 for v in pdcch_values if v == "1SYM")
+    pdcch_1sym_ratio = pdcch_1sym / len(pdcch_values) if pdcch_values else 0.0
+
+    # [25] TP variance (P5 server vs P8 pdcch 구분 — server issue는 극단적 variance)
+    tp_var = _variance(tps)
+
     return [
         tp_min, tp_max, tp_avg, tp_drop,
         sinr_min, sinr_max, sinr_avg,
@@ -180,11 +229,13 @@ def extract_features(scenario: dict) -> list[float]:
         # P2-1 확장
         sinr_var, float(pci_trans), a3_var, tilt_range,
         max_power, min_power, tp_recovery, serving_spread,
+        # P8/P9/P10 확장
+        max_cov_threshold, neighbor_completeness, pdcch_1sym_ratio, tp_var,
     ]
 
 
 # 특징 벡터 차원 수 상수 (precompute/_compute_stats 에서 사용)
-FEATURE_DIM = 22
+FEATURE_DIM = 26
 
 
 # Z-score normalization params computed once from train set
@@ -323,6 +374,13 @@ def _feature_hint(scenario: dict) -> str:
     tp_recovery = f[20]
 
     hints: list[str] = []
+
+    # P8/P9/P10 확장 features
+    max_cov_threshold = f[22] if len(f) > 22 else -105.0
+    neighbor_comp = f[23] if len(f) > 23 else 1.0
+    pdcch_1sym = f[24] if len(f) > 24 else 0.0
+    tp_var = f[25] if len(f) > 25 else 0.0
+
     # P2 Ping-pong: multiple PCI transitions + low A3
     if pci_trans >= 2 and avg_a3 <= 3:
         hints.append(f"ping-pong (PCI trans={pci_trans}, low A3={avg_a3:.1f})")
@@ -335,12 +393,21 @@ def _feature_hint(scenario: dict) -> str:
     # P4 Coverage hole: very low RSRP + low power
     elif rsrp_avg <= -100 and max_power < 30:
         hints.append(f"coverage hole (RSRP={rsrp_avg:.1f}, max_power={max_power})")
+    # P10 Coverage threshold too high
+    elif max_cov_threshold > -100:
+        hints.append(f"high coverage threshold ({max_cov_threshold:.0f} dBm, may need decrease)")
+    # P9 Missing neighbor
+    elif neighbor_comp < 0.8:
+        hints.append(f"possible missing neighbor (completeness={neighbor_comp:.2f})")
     # P5 Server issue: healthy SINR + tp recovery pattern
     elif sinr_avg >= 10 and tp_recovery > 0:
         hints.append(f"server-issue-like (SINR={sinr_avg:.1f} healthy, TP recovery)")
     # P6 Excessive downtilt
     elif max_tilt >= 20:
         hints.append(f"excessive downtilt ({max_tilt} deg)")
+    # P8 PDCCH resource
+    elif pdcch_1sym > 0.5 and sinr_avg >= 5:
+        hints.append(f"PDCCH 1SYM (ratio={pdcch_1sym:.1f}, may need 2SYM)")
 
     return "; ".join(hints) if hints else ""
 

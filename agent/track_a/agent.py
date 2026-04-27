@@ -302,12 +302,84 @@ class QwenRunner:
                 return None
         return None
 
+    def _precompute_tilt_warning(self, scenario: dict) -> str:
+        """Pre-call calculate_tilt_angle for all cells. Only return a warning if
+        a cell has significant tilt discrepancy (P6 candidate). Returns empty string
+        if no P6 signal — keeps context clean for other patterns.
+        """
+        sid = scenario.get("scenario_id")
+        data = scenario.get("data", {})
+
+        ncd_text = data.get("network_configuration_data", "")
+        ncd_lines = ncd_text.strip().split("\n")
+        if len(ncd_lines) < 2:
+            return ""
+        ncd_headers = ncd_lines[0].split("|")
+        cells = [dict(zip(ncd_headers, ln.split("|"))) for ln in ncd_lines[1:]]
+
+        upd_text = data.get("user_plane_data", "")
+        upd_lines = upd_text.strip().split("\n")
+        if len(upd_lines) < 2:
+            return ""
+        upd_headers = upd_lines[0].split("|")
+        ue_rows = [dict(zip(upd_headers, ln.split("|"))) for ln in upd_lines[1:]]
+        mid_row = ue_rows[len(ue_rows) // 2]
+        mid_time = mid_row.get("Timestamp", "").strip()
+        if not mid_time:
+            return ""
+
+        max_discrepancy = 0.0
+        max_pci = ""
+        max_actual = 0
+        max_ideal = 0.0
+
+        for c in cells:
+            pci_str = c.get("PCI", "").strip()
+            if not pci_str or not pci_str.isdigit():
+                continue
+            pci = int(pci_str)
+            mech_dt = int(c.get("Mechanical Downtilt", "0") or "0")
+            digital_t = int(c.get("Digital Tilt", "0") or "0")
+            actual_tilt = mech_dt + digital_t
+
+            try:
+                result = self.env._call(
+                    "calculate_tilt_angle", scenario_id=sid,
+                    time=mid_time, pci=pci,
+                )
+                if isinstance(result, dict) and "detail" not in result:
+                    ideal_tilt = float(list(result.values())[0])
+                    discrepancy = actual_tilt - abs(ideal_tilt)
+                    if discrepancy > max_discrepancy:
+                        max_discrepancy = discrepancy
+                        max_pci = pci_str
+                        max_actual = actual_tilt
+                        max_ideal = ideal_tilt
+            except Exception:
+                continue
+
+        # Only inject warning if significant discrepancy found
+        if max_discrepancy > 3:
+            return (
+                f"[TILT WARNING] PCI {max_pci} has actual downtilt {max_actual}° "
+                f"but geometric ideal is {max_ideal:.1f}° (discrepancy {max_discrepancy:+.1f}°). "
+                f"This cell may have EXCESSIVE DOWNTILT (P6). "
+                f"Consider selecting the 'Lift tilt angle' option for this cell."
+            )
+        return ""
+
     def run(self, scenario: dict, temperature: float = 0.0) -> dict:
         sid = scenario.get("scenario_id")
         task = scenario.get("task", {})
         options = task.get("options", [])
         opts_block = "\n".join(f"{o['id']}:{o['label']}" for o in options)
         question = f"{task.get('description', '')}\nOptions:\n{opts_block}"
+
+        # Tilt warning injection disabled — P5/P6 tilt discrepancy ranges overlap,
+        # causing P5 regression. Kept method for future use with better discrimination.
+        # tilt_warning = self._precompute_tilt_warning(scenario)
+        # if tilt_warning:
+        #     question += f"\n\n{tilt_warning}"
 
         tool_defs = self.env.get_tools()
         if not tool_defs:

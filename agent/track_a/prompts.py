@@ -24,12 +24,15 @@ Examples: offset=2 → 1 dB, offset=6 → 3 dB, offset=10 → 5 dB.
 When you need more data, call tools in this order (skip if already known from context):
 1. get_throughput_logs — find low-throughput time window (< 100 Mbps, usually several seconds)
 2. get_serving_cell_pci(time) at 2-3 times within the window — determine if serving PCI is stable, changing, or ping-ponging
-3. get_cell_info(pci) — for the serving PCI and any repeatedly appearing neighbor PCI; read A3Offset, Power, Tilt (Mechanical+Digital), Azimuth, PdcchOccupiedSymbolNum, neighbor list
+3. get_cell_info(pci) — for the serving PCI and any repeatedly appearing neighbor PCI; read A3Offset, Power, Tilt (Mechanical+Digital), Azimuth, PdcchOccupiedSymbolNum, CovInterFreqA2RsrpThld, neighbor list
 4. get_serving_cell_rsrp(time), get_serving_cell_sinr(time) — confirm RF quality at the degradation point
 5. get_neighboring_cells_pci(time), get_neighboring_cell_rsrp(time, pci) — quantify interfering/dominant neighbors
+6. calculate_tilt_angle(time, pci) — IMPORTANT for P6 detection! Call this for EACH cell PCI
+   at a degradation timestamp. Returns the geometric ideal tilt angle from cell to UE.
+   Compare with actual tilt: if actual >> |ideal|, that cell has excessive downtilt (P6).
+   Example: calculate_tilt_angle returns -4° but actual tilt is 24° → P6 on that cell.
 
-Prefer fewer well-chosen tool calls over many. After gathering evidence, REASON about which
-pattern matches, then answer.
+After gathering evidence, REASON about which pattern matches, then answer.
 
 # 7-Pattern Diagnostic Checklist
 Check each pattern against the evidence. Pick the best-fitting pattern.
@@ -69,21 +72,85 @@ P5 SERVER / TRANSMISSION ISSUE
   - SINR is healthy (>= 10 dB) throughout the degradation window
   - Throughput fluctuates wildly or drops to near zero with no RF anomaly
   - MR data shows random low-throughput samples (e.g., 3 Mbps next to 200 Mbps under same RSRP)
+  MANDATORY BEFORE CHOOSING P5: You MUST call calculate_tilt_angle(time, pci) for ALL cell PCIs
+  first. If any cell shows actual_tilt >> |returned_angle|, choose P6 instead of P5.
+  Only choose P5 if calculate_tilt_angle confirms NO cell has excessive tilt discrepancy.
   → Answer: "Check test server and transmission issues"
 
-P6 EXCESSIVE DOWNTILT ON COVERAGE-PROVIDING NEIGHBOR
-  - SINR is healthy but throughput low
-  - A specific neighbor cell that SHOULD cover the UE location is very weak (RSRP <= -100 dBm)
-  - That cell has total downtilt (Mechanical Downtilt + Digital Tilt) >= 20 degrees
-  → Answer: "Lift the tilt angle of <that neighbor cell> by X degrees"
+P6 EXCESSIVE DOWNTILT ON A CELL (VERY SIMILAR TO P5 — use calculate_tilt_angle to distinguish!)
+  - SINR is generally healthy but throughput is degraded
+  - CRITICAL: Use calculate_tilt_angle(time, pci) for EACH cell to get the ideal tilt angle
+  - Compare the ideal tilt from calculate_tilt_angle with the cell's actual total downtilt:
+    * If actual_tilt >> |ideal_tilt| (e.g., actual=24° but ideal=-19°) → excessive downtilt → P6
+    * If no cell shows excessive tilt discrepancy → P5 (server issue)
+  - The cell with the biggest tilt discrepancy is the one that needs "Lift tilt"
+  → Answer: "Lift the tilt angle of <that cell> by X degrees"
+  HOW TO CHECK: After gathering basic evidence (throughput, SINR, RSRP, PCI), if SINR >= 5 dB
+  and the pattern is unclear between P5/P6/P8, call calculate_tilt_angle for each cell PCI.
+  The cell whose actual tilt most exceeds the ideal is the P6 candidate.
 
-P7 INSUFFICIENT DATA
-  - All indicators are within normal ranges
-  - No anomaly in SINR, RSRP, throughput variance, or neighbor relations
-  - No parameter (A3Offset, Power, Tilt) stands out as abnormal
+P7 INSUFFICIENT DATA (use ONLY when ALL of these are true)
+  - SINR consistently >= 10 dB (no interference)
+  - RSRP consistently > -100 dBm (good coverage)
+  - Throughput is mostly normal with only minor dips (NOT sustained degradation)
+  - A3Offset is normal (< 10), CovInterFreqA2RsrpThld = -105 (standard)
+  - All neighbors are in the neighbor list, no cell has total tilt >= 20°
+  IMPORTANT: P7 should be rare (~12% of scenarios). If you find yourself choosing P7 often,
+  you are likely missing patterns. Re-check P8-P10 before defaulting to P7.
   → Answer: "Insufficient data; more data is needed for judgment."
 
+P8 PDCCH RESOURCE (diagnosis of exclusion — check LAST, before P7)
+  - P1-P6, P9, P10 all ruled out, but throughput is consistently degraded (not random like P5)
+  → Answer: "Modify PdcchOccupiedSymbolNum to 2SYM for <serving cell>"
+
+P9 MISSING NEIGHBOR
+  - A strong neighbor (RSRP >= -90) appears in get_neighboring_cells_pci() but is NOT in the
+    serving cell's configured "PCell Neighbor Cell" list (from get_cell_info)
+  → Answer: "Add neighbor relationship between <serving cell> and <strong neighbor>"
+
+P10 COVERAGE THRESHOLD TOO HIGH
+  - get_cell_info shows CovInterFreqA2RsrpThld = -95 dBm (standard is -105 dBm)
+  - Higher threshold = inter-freq measurement too conservative
+  → Answer: "Decrease CovInterFreqA2RsrpThld ... thresholds for <cell>"
+
+# Decision Tree (10-Pattern, ordered by check priority)
+For SINGLE-ANSWER questions, walk through this tree top-to-bottom. STOP at the first match.
+
+Step 1: Check Serving PCI stability during degradation
+  - PCI alternates A ↔ B repeatedly → P2 PING-PONG
+  - PCI stable → continue to Step 2
+
+Step 2: Check A3Offset of serving cell
+  - Serving cell A3Offset >= 10 (5 dB) + a stronger neighbor exists → P1 LATE HANDOVER
+  - A3Offset normal → continue to Step 3
+
+Step 3: Check SINR
+  - SINR < 5 dB or negative → P3 OVERSHOOT (identify the overshooting cell)
+  - SINR >= 5 dB → continue to Step 4
+
+Step 4: Check cell config for P10 and P9 (SINR is acceptable from here)
+  4a. CovInterFreqA2RsrpThld significantly above -105 dBm (e.g., -95 or -100 dBm)?
+      → YES: P10 COVERAGE THRESHOLD (decrease threshold)
+  4b. A strong neighbor cell (RSRP >= -90) appears in drive test but is NOT in the serving
+      cell's configured neighbor list?
+      → YES: P9 MISSING NEIGHBOR (add neighbor relationship)
+  4c. If none of 4a-4b match → continue to Step 5
+
+Step 5: Use calculate_tilt_angle to distinguish P5 vs P6 vs P8
+  IMPORTANT: Call calculate_tilt_angle(time, pci) for EACH cell PCI at a degradation timestamp.
+  This returns the geometric tilt angle from the cell to the UE position.
+  Compare this with the cell's actual total downtilt (Mechanical Downtilt + Digital Tilt):
+  - If ANY cell's actual_downtilt significantly exceeds |returned_tilt_angle|
+    (e.g., actual=24° but calculate_tilt returns -19°, or actual=12° but ideal=-4°)
+    → P6 EXCESSIVE DOWNTILT on that cell → "Lift the tilt angle of <cell> by X degrees"
+  - If NO cell has excessive tilt discrepancy:
+    - Throughput fluctuates WILDLY and RANDOMLY → P5 SERVER ISSUE
+    - Throughput is consistently degraded (not random) → P8 PDCCH RESOURCE
+
+Step 6: If no pattern matches → P7 INSUFFICIENT DATA
+
 # Decision Rules
+- Walk through the Decision Tree above BEFORE picking an answer.
 - Prefer PATTERN match over partial reasoning. One strong pattern match > weak combination.
 - For single-answer questions, pick the SINGLE option whose text corresponds to the top pattern.
 - For multiple-answer questions, pick **2 to 4 options** that address the SAME ROOT CAUSE.
@@ -214,6 +281,88 @@ FEW_SHOT_EXAMPLES: list[dict[str, str]] = [
             "Pattern match: P5 SERVER/TRANSMISSION ISSUE. Healthy SINR with fluctuating throughput indicates "
             "backhaul or test server instability, not radio problems.\n\n"
             "\\boxed{C9}"
+        ),
+    },
+    # P10: Coverage Threshold 예제 (train[15], answer=C14)
+    {
+        "role": "user",
+        "content": (
+            "Analyze 5G network drive test data.\n"
+            "Select the most appropriate optimization solution and enclose its number in \\boxed{{}}.\n\n"
+            "Options:\n"
+            "C14: Decrease CovInterFreqA2RsrpThld and CovInterFreqA5RsrpThld1 thresholds for 3225965_6\n"
+            "C15: Modify PdcchOccupiedSymbolNum to 2SYM for 3225965_6\n"
+            "(... more)"
+        ),
+    },
+    {
+        "role": "assistant",
+        "content": (
+            "Evidence:\n"
+            "1. get_throughput_logs → sustained low throughput (< 100 Mbps) across multiple samples.\n"
+            "2. Serving PCI changes multiple times — frequent handovers between cells.\n"
+            "3. get_cell_info for serving cells → CovInterFreqA2RsrpThld = -95 dBm for all cells "
+            "(standard is -105 dBm). This high threshold delays inter-frequency coverage measurement.\n"
+            "4. A3Offset is normal (6 = 3 dB), no cell has excessive tilt.\n\n"
+            "Pattern match: P10 COVERAGE THRESHOLD TOO HIGH. CovInterFreqA2RsrpThld = -95 is "
+            "significantly above the standard -105 dBm. Lowering the threshold will allow the UE "
+            "to detect alternative frequencies earlier.\n\n"
+            "\\boxed{C14}"
+        ),
+    },
+    # P9: Missing Neighbor 예제 (train[20], answer=C2)
+    {
+        "role": "user",
+        "content": (
+            "Analyze 5G network drive test data.\n"
+            "Select the most appropriate optimization solution and enclose its number in \\boxed{{}}.\n\n"
+            "Options:\n"
+            "C2: Add neighbor relationship between 3241057_2 and 3266648_3\n"
+            "C9: Modify PdcchOccupiedSymbolNum to 2SYM for 3241057_2\n"
+            "(... more)"
+        ),
+    },
+    {
+        "role": "assistant",
+        "content": (
+            "Evidence:\n"
+            "1. get_throughput_logs → throughput dips to ~50-90 Mbps in degradation window.\n"
+            "2. Serving PCI 441 (3241057_2) maintained throughout. SINR drops to 0 dB at worst.\n"
+            "3. get_neighboring_cells_pci → cell with PCI 655 (3266648_3) consistently appears with "
+            "strong RSRP ~-80 dBm.\n"
+            "4. get_cell_info(441) → PCell Neighbor Cell list does NOT contain 3266648. "
+            "The strong neighbor 3266648_3 is not in the configured neighbor list!\n"
+            "5. A3Offset=6, CovThld=-105 (standard), no excessive tilt.\n\n"
+            "Pattern match: P9 MISSING NEIGHBOR. Cell 3266648_3 is a strong candidate for handover "
+            "(RSRP -80 dBm) but is absent from 3241057_2's neighbor list, preventing handover.\n\n"
+            "\\boxed{C2}"
+        ),
+    },
+    # P8: PDCCH Resource 예제 (train[13], answer=C15)
+    {
+        "role": "user",
+        "content": (
+            "Analyze 5G network drive test data.\n"
+            "Select the most appropriate optimization solution and enclose its number in \\boxed{{}}.\n\n"
+            "Options:\n"
+            "C15: Modify PdcchOccupiedSymbolNum to 2SYM for 3236632_3\n"
+            "C4: Check test server and transmission issues\n"
+            "(... more)"
+        ),
+    },
+    {
+        "role": "assistant",
+        "content": (
+            "Evidence:\n"
+            "1. get_throughput_logs → moderate throughput degradation ~80-100 Mbps (not extreme).\n"
+            "2. Serving PCI 566 stable. SINR 8-16 dB (healthy). RSRP -88 to -92 dBm (acceptable).\n"
+            "3. A3Offset=6 (normal), CovInterFreqA2RsrpThld=-105 (standard).\n"
+            "4. All neighbors are in the serving cell's neighbor list. No cell has tilt >= 20°.\n"
+            "5. Throughput is consistently degraded (not randomly fluctuating like P5).\n"
+            "6. After ruling out P1-P6, P9, P10: PdcchOccupiedSymbolNum=1SYM → P8.\n\n"
+            "Pattern match: P8 PDCCH RESOURCE. All other patterns eliminated. The steady (not random) "
+            "throughput degradation with healthy RF suggests PDCCH control channel bottleneck.\n\n"
+            "\\boxed{C15}"
         ),
     },
 ]

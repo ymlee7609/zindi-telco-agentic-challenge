@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Track A 7-pattern 대표 시나리오의 기지국 구성 2D top-view + UE 시계열 시각화.
+"""Track A 10-pattern 대표 시나리오의 기지국 구성 2D top-view + UE 시계열 시각화.
 
 각 시나리오마다 2-패널 PNG:
 - 왼쪽(top-view): cell lon/lat → km offset, sector 부채꼴(Azimuth/Tx power/tilt), UE drive path
 - 오른쪽(4단 시계열): Throughput, SS-RSRP, SS-SINR, Serving PCI (시간축)
 
-Output: docs/track_a/images/P{1-7}_{slug}_train{NNN}.png
+Output: docs/track_a/images/P{1-10}_{slug}_train{NNN}.png
 
 Run:
     python agent/track_a/viz/render_pattern_topology.py
@@ -32,7 +32,7 @@ TRAIN_JSON = REPO_ROOT / "data" / "Track A" / "data" / "Phase_1" / "train.json"
 OUT_DIR = REPO_ROOT / "docs" / "track_a" / "images"
 
 # ---------------------------------------------------------------------------
-# 7-pattern 대표 시나리오 매핑 (docs/track_a/03-3_problems.md §3 근거)
+# 10-pattern 대표 시나리오 매핑 (docs/track_a/03-3_problems.md §3 + §5-ter 근거)
 # ---------------------------------------------------------------------------
 PATTERNS: list[tuple[str, str, int, str]] = [
     ("P1", "Late Handover",        2,  "Serving PCI held + high A3Offset on serving cell -> handover delayed"),
@@ -42,6 +42,9 @@ PATTERNS: list[tuple[str, str, int, str]] = [
     ("P5", "Server Issue",          1,  "SINR >= 10 (healthy) but throughput varies -- non-RF cause"),
     ("P6", "Excessive Downtilt",    4,  "Neighbor cell Mechanical + Digital Tilt >= 20 deg -> coverage gap"),
     ("P7", "Insufficient Data",     6,  "All metrics within normal range -- no anomaly, no diagnosis"),
+    ("P8", "PDCCH Resource",       13, "PdcchOccupiedSymbolNum=1SYM on serving cell -- PDCCH resource bottleneck"),
+    ("P9", "Missing Neighbor",     20, "Strong neighbor cell NOT in serving cell's configured neighbor list"),
+    ("P10", "Coverage Threshold",   15, "CovInterFreqA2RsrpThld=-95 dBm (too high vs standard -105 dBm)"),
 ]
 
 # PCI 색상 테이블 (cell 순서대로 qualitative palette)
@@ -197,26 +200,82 @@ def render_topview(
                       alpha=0.92, linewidth=1.0),
         )
 
-    # UE 샘플 점: throughput 저하 강조
+    # UE 샘플 점: serving PCI 색상 + 시간 순서 번호 + throughput 저하 강조
     if ue_xy:
-        for x, y, r in ue_xy:
+        # UE 이동 범위 계산 (겹침 감지)
+        ue_xs = [p[0] for p in ue_xy]
+        ue_ys = [p[1] for p in ue_xy]
+        ue_range = max(max(ue_xs) - min(ue_xs), max(ue_ys) - min(ue_ys))
+        is_clustered = ue_range < 0.05  # 50m 미만이면 밀집
+
+        for i, (x, y, r) in enumerate(ue_xy):
             tp = safe_float(r.get("5G KPI PCell Layer2 MAC DL Throughput [Mbps]"))
-            if tp is not None and tp < TP_THRESHOLD_MBPS:
-                ax.plot(x, y, "o", color="crimson", markersize=9,
-                        markeredgecolor="black", markeredgewidth=0.7, zorder=8)
+            serving_pci = str(r.get("5G KPI PCell RF Serving PCI", "?")).strip()
+            dot_color = pci_color.get(serving_pci, "steelblue")
+
+            is_low_tp = tp is not None and tp < TP_THRESHOLD_MBPS
+
+            # 밀집 시 점을 원형으로 분산 배치 (시계 방향)
+            if is_clustered and len(ue_xy) > 1:
+                angle = 2 * math.pi * i / len(ue_xy)
+                spread = 0.04 + 0.01 * len(ue_xy)  # 점 수에 비례
+                dx = spread * math.cos(angle)
+                dy = spread * math.sin(angle)
             else:
-                ax.plot(x, y, "o", color="steelblue", markersize=5, zorder=5)
+                dx, dy = 0, 0
+
+            px, py = x + dx, y + dy
+
+            if is_low_tp:
+                ax.plot(px, py, "o", color=dot_color, markersize=11,
+                        markeredgecolor="red", markeredgewidth=2.0, zorder=8)
+            else:
+                ax.plot(px, py, "o", color=dot_color, markersize=9,
+                        markeredgecolor="black", markeredgewidth=0.7, zorder=5)
+
+            # 시간 순서 번호 (점 위에 표시)
+            tp_text = f"{int(tp)}" if tp is not None else "?"
+            ax.annotate(
+                f"t{i}", xy=(px, py),
+                xytext=(0, 7), textcoords="offset points",
+                fontsize=5.5, ha="center", va="bottom", color="#333",
+                fontweight="bold", zorder=9,
+            )
+
+        # 밀집 시 원래 위치에 십자 마커로 실제 UE 위치 표시
+        if is_clustered:
+            cx = float(np.mean(ue_xs))
+            cy = float(np.mean(ue_ys))
+            ax.plot(cx, cy, "+", color="black", markersize=14, markeredgewidth=2.5, zorder=4)
+            ax.annotate(
+                "Actual UE pos\n(dots spread for visibility)",
+                xy=(cx, cy),
+                xytext=(15, -20), textcoords="offset points",
+                fontsize=7, ha="left", color="#555",
+                arrowprops=dict(arrowstyle="->", color="#999", lw=0.8),
+                bbox=dict(boxstyle="round,pad=0.2", fc="#f8f8f8", ec="#ccc", alpha=0.9),
+                zorder=10,
+            )
 
         ax.annotate(
-            "START", xy=(ue_xy[0][0], ue_xy[0][1]),
-            xytext=(10, 10), textcoords="offset points",
+            f"t0 START", xy=(ue_xy[0][0] + (0.04 if is_clustered else 0),
+                             ue_xy[0][1] + (0.04 if is_clustered else 0)),
+            xytext=(12, 12), textcoords="offset points",
             fontsize=8, fontweight="bold", color="darkgreen",
             bbox=dict(boxstyle="round,pad=0.2", fc="#e8f8e8", ec="darkgreen", linewidth=0.7),
             zorder=10,
         )
+        last_i = len(ue_xy) - 1
+        if is_clustered:
+            angle_last = 2 * math.pi * last_i / len(ue_xy)
+            spread = 0.04 + 0.01 * len(ue_xy)
+            end_x = ue_xy[-1][0] + spread * math.cos(angle_last)
+            end_y = ue_xy[-1][1] + spread * math.sin(angle_last)
+        else:
+            end_x, end_y = ue_xy[-1][0], ue_xy[-1][1]
         ax.annotate(
-            "END", xy=(ue_xy[-1][0], ue_xy[-1][1]),
-            xytext=(10, -14), textcoords="offset points",
+            f"t{last_i} END", xy=(end_x, end_y),
+            xytext=(12, -14), textcoords="offset points",
             fontsize=8, fontweight="bold", color="darkred",
             bbox=dict(boxstyle="round,pad=0.2", fc="#f8e8e8", ec="darkred", linewidth=0.7),
             zorder=10,
@@ -378,9 +437,9 @@ def render_scenario_figure(
         f"Triangle = gNodeB antenna  |  Wedge = sector beam (65 deg beamwidth, direction = Mechanical Azimuth)  |  "
         f"Wedge radius proportional to Tx Power\n"
         f"Wedge color: green = low total tilt (wide cover), red = tilt >= 20 deg (narrow)  |  "
-        f"Label placed behind antenna null-region  |  PCI sector color = PCI time-series color\n"
-        f"Red dashed lines: throughput<100 Mbps, RSRP<=-100 dBm, SINR<=5 dB  "
-        f"|  Red dots = UE samples below throughput threshold"
+        f"UE dots colored by serving PCI (matches time-series PCI color)\n"
+        f"t0,t1,... = time-ordered UE samples  |  Red ring = throughput < 100 Mbps  |  "
+        f"Clustered UE: + marks actual position, dots are spread for visibility"
     )
     fig.text(
         0.5, 0.025, caption,
