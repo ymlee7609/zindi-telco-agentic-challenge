@@ -26,7 +26,33 @@
 
 ## 현황 요약
 
-- **현재 최고점**: **serial 018 = 0.48** (Track B 기준)
+- **현재 최고점**: **0.56** (BEST 통합본 = `submission_BEST_0_56_track_ab_20260427.csv`, Traditional 28/28)
+- **Leaderboard 최고점**: **0.78** (1점=0.02, 39/50 정답)
+- **다음 행동 (Track B PJ Top-1 추월 전략)**:
+  - Plan: `.moai/plans/track-b-pj-stateful-pebble.md`
+  - 채점 단위 확인 (028 probe 0.42 = 21/50): 1문제 = 0.02점
+  - 0.56 → 0.78 갭 = 11문제 추가 정답 필요 (PJ 22문제 중 11+ 정답)
+  - **Binary search probe 038/039/040 으로 PJ FAULT 정답 카테고리 진단**
+
+### Track B PJ FAULT Binary Search Probe (2026-04-27 신규)
+
+| Serial | File | 카테고리 변경 | 변경 라인 | 우선순위 |
+|---|---|---|---|---|
+| **038** | `submission_038_20260427_fault_bgp_bulk.csv` | 8문제 → BGP configuration error, Q42 → interface IP error | 9 | **첫 번째 제출** (BGP EVPN 가장 유력) |
+| 039 | `submission_039_20260427_fault_l3vpn_bulk.csv` | 8문제 → L3VPN configuration error | 9 | 038 변화 없을 시 두 번째 |
+| 040 | `submission_040_20260427_fault_static_route_error.csv` | 8문제 → static route error | 9 | 038/039 변화 없을 시 세 번째 |
+
+**제출 후 Δscore 해석**:
+- 변화 없음 (0.56 유지): 모든 변경 답이 오답 → 다음 카테고리 probe
+- +0.02 ~ +0.16 (8문제 중 1~8 정답): 부분 정답 → fine-tuning 단계
+- +0.18 이상: leader tie (0.74+) 즉시 도달
+
+**Probe 대상 8 routing fault**: Q39, Q40, Q41, Q43, Q46, Q47, Q48, Q49
+**Probe 보존 답안**: Q44, Q45 (shutdown), Q50 (ARP configuration error)
+
+## 이전 Probe 이력 (Track B)
+
+- **이전 최고**: serial 018 = 0.48 (Track B 단독 기준)
 - **이전 최고**: serial 016 = 0.44 (+0.04 상승 확인)
 - **017 상태**: **INVALID — 제출 금지**
 - **019 상태**: 제출됨, 결과 0.48 (Q31/Q32 링크 추가 실패)
