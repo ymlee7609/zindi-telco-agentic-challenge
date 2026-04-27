@@ -3,7 +3,7 @@
 """Track A Qwen 용 System Prompt + Few-shot 정의.
 
 Opus 4.7 수작업 풀이 (`.moai/plans/track-a-opus-solutions.md`) 에서 증류한
-7-pattern library + A3 offset 공식 + tool 사용 순서를 encoding.
+10-pattern library + A3 offset 공식 + tool 사용 순서를 encoding.
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ When you need more data, call tools in this order (skip if already known from co
 
 After gathering evidence, REASON about which pattern matches, then answer.
 
-# 7-Pattern Diagnostic Checklist
+# 10-Pattern Diagnostic Checklist
 Check each pattern against the evidence. Pick the best-fitting pattern.
 
 P1 LATE HANDOVER (A3 too high on serving)
