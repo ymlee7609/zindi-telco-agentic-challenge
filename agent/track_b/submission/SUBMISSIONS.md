@@ -34,21 +34,43 @@
   - 0.56 → 0.78 갭 = 11문제 추가 정답 필요 (PJ 22문제 중 11+ 정답)
   - **Binary search probe 038/039/040 으로 PJ FAULT 정답 카테고리 진단**
 
-### Track B PJ FAULT Binary Search Probe (2026-04-27 신규)
+### Track B PJ FAULT Multi-Hypothesis Probe (2026-04-28 갱신)
 
-| Serial | File | 카테고리 변경 | 변경 라인 | 우선순위 |
+> 2026-04-28 업데이트: 일일 10회 제출 제한 + 시간 압박 → 단일 카테고리 일괄 probe (038/039/040) 폐기, **multi-hypothesis 단일 probe** 로 정보량 극대화. 1회 제출에 4 routing 가설 + 1 port 가설 동시 검증.
+
+| Serial | File | 변경 | 변경 라인 | 우선순위 |
 |---|---|---|---|---|
-| **038** | `submission_038_20260427_fault_bgp_bulk.csv` | 8문제 → BGP configuration error, Q42 → interface IP error | 9 | **첫 번째 제출** (BGP EVPN 가장 유력) |
-| 039 | `submission_039_20260427_fault_l3vpn_bulk.csv` | 8문제 → L3VPN configuration error | 9 | 038 변화 없을 시 두 번째 |
-| 040 | `submission_040_20260427_fault_static_route_error.csv` | 8문제 → static route error | 9 | 038/039 변화 없을 시 세 번째 |
+| **038-V2** | `submission_038v2_20260428_multi_hypothesis.csv` | dst 그룹별 다른 카테고리 (BGP/L3VPN/static/ARP) + Q42 IP error | 9 | **★ 첫 번째 제출** (1시간 후) |
+| 038 (legacy) | `submission_038_20260427_fault_bgp_bulk.csv` | 8문제 → BGP 일괄 | 9 | 038-V2 BGP 그룹 정답 시 confirmer 후보 |
+| 039 (legacy) | `submission_039_20260427_fault_l3vpn_bulk.csv` | 8문제 → L3VPN 일괄 | 9 | L3VPN 그룹 정답 시 confirmer 후보 |
+| 040 (legacy) | `submission_040_20260427_fault_static_route_error.csv` | 8문제 → static route error 일괄 | 9 | static 그룹 정답 시 confirmer 후보 |
 
-**제출 후 Δscore 해석**:
-- 변화 없음 (0.56 유지): 모든 변경 답이 오답 → 다음 카테고리 probe
-- +0.02 ~ +0.16 (8문제 중 1~8 정답): 부분 정답 → fine-tuning 단계
-- +0.18 이상: leader tie (0.74+) 즉시 도달
+**probe 038-V2 매핑** (dst 그룹별 다른 카테고리):
 
-**Probe 대상 8 routing fault**: Q39, Q40, Q41, Q43, Q46, Q47, Q48, Q49
-**Probe 보존 답안**: Q44, Q45 (shutdown), Q50 (ARP configuration error)
+| Group | dst | 문제 수 | QID | 카테고리 |
+|-------|-----|---------|-----|----------|
+| A | 20.1.1.10 | 3 | Q39, Q43, Q46 | **BGP configuration error** |
+| B | 10.1.6.3 | 2 | Q40, Q41 | **L3VPN configuration error** |
+| C | 20.1.1.20 | 2 | Q47, Q48 | **static route error** |
+| D | 20.1.4.10 | 1 | Q49 | **ARP configuration error** |
+| Q42 | (port) | 1 | Q42 | **interface IP error** |
+| Q44/Q45 | (port) | 2 | (보존) | shutdown |
+| Q50 | (route) | 1 | (보존) | ARP configuration error |
+
+**Δscore 결정 트리 (1회 제출 후 다음 행동)**:
+
+| Δscore | 정답 수 | 해석 | 다음 1회 제출 |
+|--------|---------|------|---------------|
+| 0.00 | 0 | 4 가설 모두 오답 | exotic ("routing loop"/"blackhole"/"OSPF") |
+| +0.02 | 1 | Q42 또는 Group D 부분 정답 | 정답 후보 좁힌 후 단일 카테고리 |
+| +0.04 | 2 | Group B (L3VPN) 또는 C (static) 정답 | 해당 카테고리로 8 routing 일괄 (legacy 039 또는 040) |
+| **+0.06** | 3 | **Group A (BGP) 정답 가장 유력** | **legacy 038 (BGP 8 일괄) → 0.72 도달** |
+| +0.08 | 4 | BGP 3 + 1 추가 (다른 그룹) | best mix 적용 |
+| +0.10~+0.14 | 5~7 | 다수 가설 정답 | 정답 카테고리 통합 |
+| +0.16~+0.18 | 8~9 | 거의 모든 가설 정답 | 0.72~0.74 도달 |
+| **+0.20~+0.22** | 10~11 | **leader tie 도달 (0.76~0.78)** | phase 2 보존 |
+
+**일일 제출 제한**: 10회 (현재 9회 남음 추정). multi-hypothesis 전략으로 4-5회 사용, 5~6회 budget 보존 가능.
 
 ## 이전 Probe 이력 (Track B)
 

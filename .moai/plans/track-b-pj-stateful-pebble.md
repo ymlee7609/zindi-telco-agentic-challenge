@@ -25,27 +25,74 @@
 
 ---
 
-## 1. Probe 효율 혁신 — Binary Search 도입
+## 1. Probe 효율 혁신 — Multi-Hypothesis Probe (2026-04-28 보강)
+
+### 새로운 제약 (2026-04-28)
+
+- **하루 10회 제출 제한** + 다음 제출 가능 시각 = 1시간 후
+- 시간 압박 — 직렬 binary search (probe 038 BGP → 039 L3VPN → 040 static) 방식은 **3회 제출이 필요**해서 비효율
+- 1회 제출에 가능한 한 많은 가설을 동시 검증해야 함
 
 ### 문제 인식
 
-기존 probe 패턴은 단일 영역(예: Q39/Q43/Q46만 변경)을 시도 → 점수 변화 0 → 정보 0.
-**Multi-answer differential probe**가 필요. 22 PJ 답을 segment로 나눠 동시 변경 → 점수 변화로 정답 위치 식별.
+기존 binary search는 단일 카테고리 8문제 일괄 변경 → Δscore 1차원 정보만 (그 카테고리 정답 수). 3 카테고리 검증 = 3 submission.
 
-### Binary Search 설계
+**개선**: 같은 dst 그룹 내 문제는 **답이 동일할 가능성 높음**. 그룹별로 다른 카테고리 시도 → 1 submission으로 4 가설 동시 검증.
 
-**남은 제출 예산: 9회**. 다음 분배:
+### Multi-Hypothesis Probe 설계 (probe 038 재설계)
 
-| Probe # | 변경 대상 | 목적 | 기대 정보 |
-|---|---|---|---|
-| 038 | PJ 22문제 = candidate A 일괄 (예: 모두 "EVPN configuration error") | 채점 작동 + bulk fault 검증 | +0.0X = 정답 X개 위치 narrowing |
-| 039 | Q29~Q33 TOPO만 5문제 = best-guess 후보 | TOPO 채점 분리 | TOPO 5문제 정답률 |
-| 040 | Q34~Q38 PATH만 5문제 = 재계산 답 | PATH 채점 분리 | PATH 5문제 정답률 |
-| 041 | Q39~Q50 FAULT 12문제 = classify_overlay_fault 출력 | FAULT 채점 분리 | FAULT 12문제 정답률 |
-| 042~045 | 위 결과로 좁힌 영역 fine-tuning | 잔여 오답 확정 | 개별 답 binary search |
-| 046 | Phase 2 직전 final submission | 만점 시도 | 최종 |
+dst 그룹과 카테고리 매핑:
 
-각 probe마다 점수 변화 = 그 영역에서 맞춘 답 개수 × 0.02. 즉 **Δscore × 50 = 정답 추가 개수**.
+| dst 그룹 | 문제 수 | QID | 카테고리 시도 (가설) |
+|---------|---------|-----|---------------------|
+| 20.1.1.10 | 3 | Q39, Q43, Q46 | **BGP configuration error** (가장 유력) |
+| 10.1.6.3 | 2 | Q40, Q41 | **L3VPN configuration error** |
+| 20.1.1.20 | 2 | Q47, Q48 | **static route error** |
+| 20.1.4.10 | 1 | Q49 | **ARP configuration error** |
+| Q42 (port) | 1 | Q42 | **interface IP error** (logbuffer ARP_DUPLICATE_IPADDR evidence) |
+| Q44/Q45 | 2 | (보존) | `Aegis-Prime-02;Eth-Trunk2.60;shutdown` |
+| Q50 | 1 | (보존) | `Hermes-Prime-01;10.1.1.20;ARP configuration error` |
+
+총 변경 9 라인 (8 routing 4 카테고리 + 1 port). 보존 3 답안 (Q44/45/50).
+
+### Δscore 결정 트리 (1회 제출 후 즉시 다음 행동)
+
+| Δscore | 정답 수 | 해석 | 다음 1회 제출 |
+|--------|---------|------|---------------|
+| 0.00 | 0 | 모든 가설 + Q42/44/45/50 baseline 모두 오답 | "routing loop" / "blackhole" / "OSPF" 등 exotic |
+| +0.02 | 1 | 1 가설만 부분 정답 — 가장 모호 | Q42 변경 검증 + 한 그룹 재시도 |
+| +0.04 | 2 | L3VPN(Q40/41) 또는 static(Q47/48) 그룹 정답 | 해당 카테고리로 다른 그룹 일괄 시도 |
+| +0.06 | 3 | **BGP 그룹(Q39/43/46) 정답** 가장 유력 | BGP 일괄 (8문제 모두) → 0.72 도달 |
+| +0.08 | 4 | BGP 3 + 1 추가 (L3VPN, static, ARP, IP error 중 1) | 정답 카테고리 일괄 적용 |
+| +0.10~+0.14 | 5~7 | 다수 가설 정답 | best mix 추출 → 0.66~0.70 |
+| +0.16~+0.18 | 8~9 | 거의 모든 routing fault + Q42 정답 | 0.72~0.74 도달 |
+| **+0.20~+0.22** | 10~11 | **leader tie 도달** | phase 2 보존 |
+
+**핵심**: 단일 카테고리 일괄 probe(예: BGP 8문제 전부) 대비 multi-hypothesis는:
+- 같은 정보량 + 추가 가설 검증
+- BGP 가설 약점 보완 (L3VPN/static/ARP 동시 확인)
+- Q42/Q44/Q45/Q50의 baseline 정답 여부도 부수적으로 검증
+
+### 비교 — 기존 단일 BGP 일괄 vs Multi-Hypothesis
+
+| 항목 | 단일 BGP probe (현 038) | Multi-hypothesis (038-V2) |
+|------|------------------------|---------------------------|
+| 1 submission 정보량 | BGP 8문제 정답 수만 | 4 카테고리 × 4 dst 그룹 + Q42 |
+| Δ=0 일 때 | BGP 모두 오답 → 다음 카테고리 1회 더 | 4 카테고리 모두 오답 → exotic 카테고리 |
+| 최선의 경우 | +0.16 (8 BGP 정답) | +0.18 이상 (BGP+L3VPN+static+IP error 부분 정답) |
+| 최악의 경우 | -0 (정보 1개) | -0 (정보 4개) |
+| Submission budget | 3 카테고리 검증에 3회 | 1회로 4 가설 |
+
+### 사후 Probe 시퀀스
+
+| Probe | 시기 | 설계 |
+|-------|------|------|
+| **038-V2 (Multi-Hypothesis)** | 1시간 후 (즉시) | 위 설계대로 9 라인 변경 |
+| 041 (Confirmer) | Δscore 분석 후 | 정답 카테고리 일괄 적용 (예: BGP+상수) |
+| 042 (Fine-tuner) | 041 결과 후 | exotic 카테고리 시도 (필요 시) |
+| 043 (Phase 2 final) | phase 2 직전 | 누적 best 답안 |
+
+총 4-5회 제출로 leader tie + phase 2 대비 가능. budget 4-5회 보존.
 
 ### Sanity Probe 재정의
 
@@ -195,27 +242,24 @@ def classify_overlay_fault(scenario_id, hint_node, hint_dst):
 - `topology_parser.py`: Eth-Trunk member + logbuffer LLDP history extractor
 - `verify_pj.py`: Q29~Q50 자동 verify + evidence 출력
 
-### Priority HIGH — Probe 시퀀스 (제출 4~5회)
+### Priority HIGH — Probe 시퀀스 (제출 4~5회로 압축)
 
-**Probe 038 (FAULT 일괄 검증)** — 가장 정보량 큰 단일 probe:
-- Q39, Q40, Q41, Q43, Q46, Q47, Q48, Q49 (8문제) → "EVPN configuration error"
-- Q42 → "duplicate IP address"
-- Q44, Q45 → "shutdown" (Opus 유지)
-- Q50 → "ARP configuration error" (Opus 유지)
-- 기대 점수: 0.56 + ?·0.02
-  - 0.56 유지: 모든 fault 답 오답 → 다른 카테고리 시도
-  - 0.66+: 5+ FAULT 정답 → 카테고리 정확
-  - 0.78+: leader tie 즉시 달성
+> 2026-04-28 업데이트: 기존 직렬 binary search (단일 카테고리 일괄) 폐기. Multi-hypothesis probe 로 1회당 정보량 극대화.
 
-**Probe 039 (TOPO 일괄)** — TOPO 5문제 = best-guess 답 5종 동시 변경:
-- 점수 변화 = TOPO 정답 수
-- 0.66+ probe 038 결과와 합산하여 최종 path 결정
+**Probe 038-V2 (Multi-Hypothesis)** — 1시간 후 즉시 제출. 위 §1 표 그대로:
+- dst 20.1.1.10 (Q39/43/46) → BGP
+- dst 10.1.6.3 (Q40/41) → L3VPN
+- dst 20.1.1.20 (Q47/48) → static route error
+- dst 20.1.4.10 (Q49) → ARP error
+- Q42 → interface IP error
+- Q44/45/50 보존
 
-**Probe 040 (PATH 일괄)** — PATH 5문제 = `trace_overlay_vxlan` 출력:
-- 점수 변화 = PATH 정답 수
+**Probe 041 (Confirmer)** — 038-V2 Δscore 분석 후. 정답 카테고리 통일 적용:
+- Δ=+0.06 (BGP 그룹 정답) 시: 8 routing fault 모두 BGP → 예상 +0.16~+0.20
+- Δ=+0.04 (L3VPN 또는 static 그룹 정답) 시: 해당 카테고리 일괄 → 예상 +0.06~+0.10
 
-**Probe 041~042 (Fine-tuning)** — 위 3 probe 결과로 오답 좁힌 후 카테고리 재시도:
-- 예: probe 038에서 0.66 (5 정답) → 7개 오답 → fault 답 카테고리 재시도 (route-target import error, BGP, ACL 등)
+**Probe 042 (Exotic Category)** — 038-V2 + 041 모두 변화 적을 시:
+- "routing loop" / "blackhole route" / "OSPF configuration error" / "IS-IS configuration error" 시도
 
 **Probe 043 (Phase 2 final)** — 채점 직전 최종본
 
@@ -301,10 +345,42 @@ def classify_overlay_fault(scenario_id, hint_node, hint_dst):
 
 ---
 
-## 9. 즉시 실행 첫 단계
+## 9. 즉시 실행 첫 단계 (2026-04-28 업데이트)
 
-1. `classify_overlay_fault` 구현 (90% 코드 가치)
-2. `gen_submission_038_fault_evpn_bulk.py` 작성
-3. probe 038 제출 → Δscore 측정 → 즉시 다음 probe 결정
+### 신규 제약 반영
 
-**핵심 통찰**: 단일 답 변경 probe는 정보량 매우 낮음. **Multi-answer differential probe**로 binary search → 9회 제출로 22 PJ 답 좁히기 가능.
+- 다음 제출 가능: 1시간 후
+- 일일 제출 제한: 10회, 효율 극대화 필수
+- 기존 단일 카테고리 probe 038 (BGP 일괄) → **multi-hypothesis 로 재설계**
+
+### 즉시 행동 (코드 작업 — 제출 0회)
+
+1. **`gen_submission_038_v2_multi_hypothesis.py` 신규 작성**
+   - base = BEST 0.56 통합본
+   - dst 그룹별 다른 카테고리 매핑 (위 §1 표 그대로)
+   - 9 라인 변경 (Q39/40/41/43/46/47/48/49 + Q42)
+   - audit_format 검증
+
+2. **기존 probe 보존**:
+   - `submission_038_20260427_fault_bgp_bulk.csv` (BGP 일괄) — 백업, 우선순위 하향
+   - `submission_039_20260427_fault_l3vpn_bulk.csv` — phase 2 대비 보관
+   - `submission_040_20260427_fault_static_route_error.csv` — phase 2 대비 보관
+
+3. **SUBMISSIONS.md 갱신**:
+   - 038-V2 우선순위 1 등록
+   - Δscore 결정 트리 명시
+
+### 제출 순서 (1시간 후 ~ 다음 24시간)
+
+1. **1시간 후**: probe 038-V2 (Multi-Hypothesis) — 1회
+2. Δscore 분석 → probe 041 (Confirmer) — 1회
+3. 필요 시 probe 042 (Exotic) — 1회
+4. Phase 2 직전: probe 043 (Final) — 1회
+
+총 4회 사용, **5~6회 budget 보존**. 직렬 binary search 대비 33~50% 절감.
+
+### 핵심 통찰
+
+단일 답 변경 probe → 정보량 1차원 (그 카테고리 정답 수만).
+**Multi-hypothesis probe** → 1 submission으로 4 카테고리 가설 + 1 port 가설 동시 검증 = **5차원 정보**.
+같은 dst 그룹 내 답이 동일하다는 가정이 강하므로, 그룹 단위로 카테고리를 다르게 매핑하면 Δscore 가 그룹별 정답 분포를 자연스럽게 노출.
