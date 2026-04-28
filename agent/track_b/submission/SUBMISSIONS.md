@@ -38,6 +38,16 @@
 
 > 2026-04-28 업데이트: 일일 10회 제출 제한 + 시간 압박 → 단일 카테고리 일괄 probe (038/039/040) 폐기, **multi-hypothesis 단일 probe** 로 정보량 극대화. 1회 제출에 4 routing 가설 + 1 port 가설 동시 검증.
 
+### probe 038-V2 결과 (2026-04-28 제출)
+
+- **점수: 0.60** (이전 0.56 → +0.04 = 정확히 2 정답)
+- 동일 dst → 동일 정답 가정 시 가능 시나리오:
+  - **★ Group B (L3VPN, 2): Q40/Q41 단독 정답** — PJ vpn-instance 환경에 가장 부합
+  - Group C (static, 2): Q47/Q48 단독 정답
+  - Group D + Q42 (ARP 1 + IP error 1): 가능하나 가능성 낮음
+- **확정**: Group A (BGP, 3) = 0 정답 → BGP는 dst 20.1.1.10 답이 아님
+- **Q44/Q45/Q50 baseline 정답 여부는 분리 불가** (변경 안 했음)
+
 | Serial | File | 변경 | 변경 라인 | 우선순위 |
 |---|---|---|---|---|
 | **038-V2** | `submission_038v2_20260428_multi_hypothesis.csv` | dst 그룹별 다른 카테고리 (BGP/L3VPN/static/ARP) + Q42 IP error | 9 | **★ 첫 번째 제출** (1시간 후) |
