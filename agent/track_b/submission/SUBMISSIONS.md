@@ -57,23 +57,47 @@
 - Group B 또는 Group C 중 정확히 하나가 정답 (분리 미완)
 - Q42, Q44, Q45, Q50: 효과 미상 (변경 미시도 또는 단일 카테고리만)
 
-### probe 042 (2026-04-28, 다음 제출)
+### probe 042 결과 (2026-04-28 제출)
 
-`submission_042_20260428_dual_control_exotic.csv` (9 라인 변경, audit PASS)
+- **점수: 0.60** (변화 없음)
+- Group A (routing loop), Group D (blackhole route), Q42 (VPN config missing) 모두 오답
+- **★ Group B (L3VPN, Q40/Q41) 정답 단독 확정**
+  - probe 039 분석: S2 (Group C static 단독) 시 0.56이 되어야 하나 0.60 → S2 부정
+  - Group B L3VPN 만 +0.04 기여한다는 결론 (S1 확정)
+
+### 누적 오답 카테고리 (Group B 외 모두 미해결)
+
+| 그룹 | 시도된 오답 카테고리 |
+|------|---------------------|
+| A (Q39/43/46) | BGP, L3VPN, routing loop, missing static route(baseline) |
+| C (Q47/48) | static, L3VPN, missing static route |
+| D (Q49) | ARP, L3VPN, blackhole, missing static route |
+| Q42 | MAC(baseline), interface IP error, VPN configuration missing |
+
+### probe 043 (2026-04-28, 다음 제출)
+
+`submission_043_20260428_unexplored_categories.csv` (9 라인 변경, audit PASS)
+
+미시도 카테고리 동시 검증 — Group B control + 4 새 가설:
 
 | Group | dst | QID | 카테고리 |
 |-------|-----|-----|----------|
-| A | 20.1.1.10 | Q39/43/46 | **routing loop** ★ exotic |
-| B | 10.1.6.3 | Q40/41 | L3VPN — control 1 |
-| C | 20.1.1.20 | Q47/48 | static — control 2 |
-| D | 20.1.4.10 | Q49 | **blackhole route** ★ exotic |
-| Q42 | (port) | Q42 | **VPN configuration missing** ★ new |
+| A | 20.1.1.10 | Q39/43/46 | **IS-IS configuration error** ★ 미시도 |
+| B | 10.1.6.3 | Q40/41 | L3VPN — control (정답 확정) |
+| C | 20.1.1.20 | Q47/48 | **ARP configuration error** ★ 미시도 |
+| D | 20.1.4.10 | Q49 | **OSPF configuration error** ★ 미시도 |
+| Q42 | (port) | Q42 | **MTU value configuration error** ★ 미시도 |
 
-**Δscore vs 0.56 결정 트리**:
-- +0.04 (0.60): S1/S2 분리 못함, exotic 모두 오답 → isolation probe 필요
-- **+0.08 (0.64)**: Group B + Group C 둘 다 정답 ★ 최선 (4 routing fault 정답 확정)
-- +0.06 (0.62): 한 그룹 + 1 exotic 정답 (3 정답)
-- +0.10~+0.14 (0.66~0.70): 다수 정답
+**Δscore vs 0.56 (BEST) 결정 트리**:
+
+| 점수 | 정답 수 | 해석 |
+|------|---------|------|
+| 0.60 (그대로) | 2 | 새 가설 모두 오답 → loopback IP / L2VPN / SRV6 시도 |
+| 0.62 (+1) | 3 | Group D OSPF 또는 Q42 MTU 정답 |
+| 0.64 (+2) | 4 | Group C ARP 정답 |
+| 0.66 (+3) | 5 | Group A IS-IS 또는 Group C + 1 |
+| 0.68~0.72 | 6~8 | 다수 정답 |
+| **0.74** | 9 | **모든 새 가설 정답 → leader tie (0.78) 거의 도달** |
 
 | Serial | File | 변경 | 변경 라인 | 우선순위 |
 |---|---|---|---|---|
