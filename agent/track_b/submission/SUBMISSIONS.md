@@ -104,29 +104,53 @@
 Group A/C/D dst 모두 cross-zone PJGFA peer (20.x.x.x). Group B 만 PJ 내부 vpn (10.1.6.x).
 **cross-zone universal 카테고리 가능성** (SRV6 / L2VPN / loopback IP).
 
-### probe 044 (2026-04-28, 다음 제출)
+### probe 044 결과 (2026-04-28 제출)
 
-`submission_044_20260428_srv6_crosszone.csv` (9 라인 변경, audit PASS — port enum 보강)
+- **점수: 0.60** (변화 없음)
+- SRV6 cross-zone universal 가설 부정. host info missing (Q42) 도 오답.
 
-cross-zone universal SRV6 hypothesis:
+### 데이터 분석 결과 (2026-04-28, raw current-configuration diff)
 
-| Group | dst | QID | 카테고리 |
-|-------|-----|-----|----------|
-| A | 20.1.1.10 | Q39/43/46 | **SRV6-Policy tunnel planning error** ★ 미시도 |
-| B | 10.1.6.3 | Q40/41 | L3VPN — control (정답 확정) |
-| C | 20.1.1.20 | Q47/48 | **SRV6-Policy tunnel planning error** ★ 미시도 |
-| D | 20.1.4.10 | Q49 | **SRV6-Policy tunnel planning error** ★ 미시도 |
-| Q42 | (port) | Q42 | **host information collection function missing** ★ 미시도 |
+probe 038-V2/039/042/043/044 모두 0.60 → 시도된 13가지 routing fault 카테고리 거의 다
+부정 → 답안 형식 자체가 다른 가능성 → raw diff 분석으로 root cause 식별.
+
+**핵심 발견 (Q39 vs Q29 모든 디바이스 diff)**:
+
+1. **Aegis-Prime-01/02 GE0/0/0 IP 변경** (모든 PJ fault scenario 공통):
+   - 정상: `ip address 20.0.0.2 255.255.255.0`
+   - 변이: `ip binding vpn-instance default` + `ip address 192.168.0.1 255.255.255.0`
+
+2. **Atlas-Prime-01 GE1/0/0 OSPF peer (192.168.1.2 = Aegis-Prime-01) DOWN**:
+   - cross-zone routes 10개 잃음 (10.1.1.0/24, 10.1.2.0/24, 1.1.5.1/32 등)
+   - dst 20.1.1.10/20.1.1.20/20.1.4.10 unreachable
+
+3. **Group B (Q40, L3VPN 정답)** 의 추가 변이:
+   - Demeter-Prime-01 vpn1 vpn-target export/import 누락
+   - L3VPN configuration error 가 진짜 fault root cause
+
+→ Group A/C/D 진짜 답: **`Aegis-Prime-01;GE0/0/0;interface IP error`** (port fault, root cause)
+
+### probe 045 (2026-04-28, 다음 제출)
+
+`submission_045_20260428_aegis_iface_ip_error.csv` (9 라인 변경, audit PASS)
+
+| Group | QID | 답안 | 근거 |
+|-------|-----|------|------|
+| A | Q39/43/46 | `Aegis-Prime-01;GE0/0/0;interface IP error` | raw diff |
+| B | Q40/41 | `Demeter-Prime-01;10.1.6.3;L3VPN configuration error` | control 정답 확정 |
+| C | Q47/48 | `Aegis-Prime-01;GE0/0/0;interface IP error` | raw diff |
+| D | Q49 | `Aegis-Prime-01;GE0/0/0;interface IP error` | raw diff |
+| Q42 | Q42 | `Demeter-Prime-02;GE1/0/5;traffic congestion on port bandwidth` | 마지막 미시도 |
 
 **Δscore vs 0.56 결정 트리**:
 
 | 점수 | 정답 수 | 해석 |
 |------|---------|------|
-| 0.60 (그대로) | 2 | SRV6 모두 오답 → 다음 probe loopback IP / L2VPN universal |
-| 0.62~0.66 | 3~5 | 부분 SRV6 정답 |
-| 0.68~0.70 | 6~7 | 다수 정답 |
-| **0.72** | 8 | **SRV6 universal cross-zone 정답 (best)** |
-| 0.74 | 9 | SRV6 + Q42 host info 정답 |
+| 0.60 | 2 | Aegis IP error 부정 → multi-line 또는 Aegis-Prime-02 추가 시도 |
+| 0.66 | 5 | Group A 단독 정답 (3 추가) |
+| **0.72** | 8 | **Group A+C+D Aegis IP error 정답 (6 추가) ★ cross-zone universal** |
+| 0.74 | 9 | Group A+C+D + Q42 traffic congestion 정답 |
+| ★★ leader 0.78 까지 0.04~0.06 거리 |
 
 | Serial | File | 변경 | 변경 라인 | 우선순위 |
 |---|---|---|---|---|
