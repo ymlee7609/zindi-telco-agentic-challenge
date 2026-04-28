@@ -41,12 +41,39 @@
 ### probe 038-V2 결과 (2026-04-28 제출)
 
 - **점수: 0.60** (이전 0.56 → +0.04 = 정확히 2 정답)
-- 동일 dst → 동일 정답 가정 시 가능 시나리오:
-  - **★ Group B (L3VPN, 2): Q40/Q41 단독 정답** — PJ vpn-instance 환경에 가장 부합
-  - Group C (static, 2): Q47/Q48 단독 정답
-  - Group D + Q42 (ARP 1 + IP error 1): 가능하나 가능성 낮음
-- **확정**: Group A (BGP, 3) = 0 정답 → BGP는 dst 20.1.1.10 답이 아님
-- **Q44/Q45/Q50 baseline 정답 여부는 분리 불가** (변경 안 했음)
+
+### probe 039 결과 (2026-04-28 제출)
+
+- **점수: 0.60** (변화 없음)
+- L3VPN 8 일괄 변경 → 점수 그대로 → 두 가능 시나리오:
+  - S1. Group B (L3VPN, Q40/Q41) 정답 단독 — 변경 효과 그대로 +0.04 유지
+  - S2. Group C (static, Q47/Q48) 정답 — probe 039 에서 Group C 잃고 Group B L3VPN 으로 swap (+0.04 유지)
+- 추가 분리 probe 필요
+
+### 누적 확정 사실
+
+- Group A (Q39/Q43/Q46, dst 20.1.1.10): BGP/L3VPN 모두 오답 (3문제 0 정답)
+- Group D (Q49, dst 20.1.4.10): ARP/L3VPN 모두 오답 (1문제 0 정답)
+- Group B 또는 Group C 중 정확히 하나가 정답 (분리 미완)
+- Q42, Q44, Q45, Q50: 효과 미상 (변경 미시도 또는 단일 카테고리만)
+
+### probe 042 (2026-04-28, 다음 제출)
+
+`submission_042_20260428_dual_control_exotic.csv` (9 라인 변경, audit PASS)
+
+| Group | dst | QID | 카테고리 |
+|-------|-----|-----|----------|
+| A | 20.1.1.10 | Q39/43/46 | **routing loop** ★ exotic |
+| B | 10.1.6.3 | Q40/41 | L3VPN — control 1 |
+| C | 20.1.1.20 | Q47/48 | static — control 2 |
+| D | 20.1.4.10 | Q49 | **blackhole route** ★ exotic |
+| Q42 | (port) | Q42 | **VPN configuration missing** ★ new |
+
+**Δscore vs 0.56 결정 트리**:
+- +0.04 (0.60): S1/S2 분리 못함, exotic 모두 오답 → isolation probe 필요
+- **+0.08 (0.64)**: Group B + Group C 둘 다 정답 ★ 최선 (4 routing fault 정답 확정)
+- +0.06 (0.62): 한 그룹 + 1 exotic 정답 (3 정답)
+- +0.10~+0.14 (0.66~0.70): 다수 정답
 
 | Serial | File | 변경 | 변경 라인 | 우선순위 |
 |---|---|---|---|---|
