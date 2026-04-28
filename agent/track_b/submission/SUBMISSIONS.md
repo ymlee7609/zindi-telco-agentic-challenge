@@ -74,30 +74,59 @@
 | D (Q49) | ARP, L3VPN, blackhole, missing static route |
 | Q42 | MAC(baseline), interface IP error, VPN configuration missing |
 
-### probe 043 (2026-04-28, 다음 제출)
+### probe 043 결과 (2026-04-28 제출)
 
-`submission_043_20260428_unexplored_categories.csv` (9 라인 변경, audit PASS)
+- **점수: 0.60** (변화 없음)
+- IS-IS (Group A), ARP (Group C), OSPF (Group D), MTU (Q42) 모두 오답 확정
+- 누적 5 카테고리 시도 (BGP/L3VPN/static/ARP/IS-IS/routing loop/blackhole/OSPF) 가 Group A/C/D 에서 모두 오답
 
-미시도 카테고리 동시 검증 — Group B control + 4 새 가설:
+### 누적 시도 정리 (Group B 외)
+
+| 그룹 | 시도된 오답 카테고리 |
+|------|---------------------|
+| A (Q39/43/46) | BGP, L3VPN, routing loop, IS-IS, missing static route(baseline) |
+| C (Q47/48) | static, L3VPN, ARP, missing static route |
+| D (Q49) | ARP, L3VPN, blackhole, OSPF, missing static route |
+| Q42 | MAC(baseline), interface IP error, VPN config missing, MTU |
+
+13 routing fault 키워드 미시도 (전 그룹):
+- loopback IP configuration conflict
+- L2VPN configuration error
+- SRV6-Policy tunnel planning error
+
+8 port fault 키워드 미시도 (Q42):
+- traffic congestion on port bandwidth
+- host information collection function missing
+- OSPF configuration error (port)
+
+### 핵심 통찰
+
+Group A/C/D dst 모두 cross-zone PJGFA peer (20.x.x.x). Group B 만 PJ 내부 vpn (10.1.6.x).
+**cross-zone universal 카테고리 가능성** (SRV6 / L2VPN / loopback IP).
+
+### probe 044 (2026-04-28, 다음 제출)
+
+`submission_044_20260428_srv6_crosszone.csv` (9 라인 변경, audit PASS — port enum 보강)
+
+cross-zone universal SRV6 hypothesis:
 
 | Group | dst | QID | 카테고리 |
 |-------|-----|-----|----------|
-| A | 20.1.1.10 | Q39/43/46 | **IS-IS configuration error** ★ 미시도 |
+| A | 20.1.1.10 | Q39/43/46 | **SRV6-Policy tunnel planning error** ★ 미시도 |
 | B | 10.1.6.3 | Q40/41 | L3VPN — control (정답 확정) |
-| C | 20.1.1.20 | Q47/48 | **ARP configuration error** ★ 미시도 |
-| D | 20.1.4.10 | Q49 | **OSPF configuration error** ★ 미시도 |
-| Q42 | (port) | Q42 | **MTU value configuration error** ★ 미시도 |
+| C | 20.1.1.20 | Q47/48 | **SRV6-Policy tunnel planning error** ★ 미시도 |
+| D | 20.1.4.10 | Q49 | **SRV6-Policy tunnel planning error** ★ 미시도 |
+| Q42 | (port) | Q42 | **host information collection function missing** ★ 미시도 |
 
-**Δscore vs 0.56 (BEST) 결정 트리**:
+**Δscore vs 0.56 결정 트리**:
 
 | 점수 | 정답 수 | 해석 |
 |------|---------|------|
-| 0.60 (그대로) | 2 | 새 가설 모두 오답 → loopback IP / L2VPN / SRV6 시도 |
-| 0.62 (+1) | 3 | Group D OSPF 또는 Q42 MTU 정답 |
-| 0.64 (+2) | 4 | Group C ARP 정답 |
-| 0.66 (+3) | 5 | Group A IS-IS 또는 Group C + 1 |
-| 0.68~0.72 | 6~8 | 다수 정답 |
-| **0.74** | 9 | **모든 새 가설 정답 → leader tie (0.78) 거의 도달** |
+| 0.60 (그대로) | 2 | SRV6 모두 오답 → 다음 probe loopback IP / L2VPN universal |
+| 0.62~0.66 | 3~5 | 부분 SRV6 정답 |
+| 0.68~0.70 | 6~7 | 다수 정답 |
+| **0.72** | 8 | **SRV6 universal cross-zone 정답 (best)** |
+| 0.74 | 9 | SRV6 + Q42 host info 정답 |
 
 | Serial | File | 변경 | 변경 라인 | 우선순위 |
 |---|---|---|---|---|

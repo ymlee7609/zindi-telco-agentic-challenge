@@ -51,6 +51,7 @@ PORT_FAULT_REASONS = frozenset({
     "VPN configuration missing",
     "OSPF configuration error",
     "MTU value configuration error",
+    "host information collection function missing",  # question.txt 8th port fault
 })
 
 ALL_FAULT_REASONS = ROUTING_FAULT_REASONS | PORT_FAULT_REASONS
